@@ -1,1177 +1,865 @@
+/**
+ * Linear Algebra Simulator - Professional Engineering Tool
+ * Rebuild with robust math engine, step-by-step solutions, and professional UX
+ */
+
 document.addEventListener("DOMContentLoaded", () => {
-  /* =========================================================
-     Optimized Helper Module with ES6+ Classes
-  ========================================================= */
-  const DOM = {
-    select: (sel) => document.querySelector(sel),
-    selectAll: (sel) => document.querySelectorAll(sel),
-    create: (tag) => document.createElement(tag),
-  };
+  // =========================================================
+  //  STATE MANAGEMENT - Centralized Application State
+  // =========================================================
+  const AppState = (() => {
+    let state = {
+      matrices: {
+        A: null,
+        B: null,
+        b: null,
+      },
+      selectedTab: "equations",
+      results: [],
+      stepSolution: null,
+    };
 
-  const $ = (sel) => DOM.select(sel);
+    return {
+      getState: () => ({ ...state }),
+      setMatrix: (name, matrix) => {
+        state.matrices[name] = matrix;
+      },
+      getMatrix: (name) => state.matrices[name],
+      setTab: (tab) => {
+        state.selectedTab = tab;
+      },
+      addResult: (result) => {
+        state.results.push(result);
+      },
+      clearResults: () => {
+        state.results = [];
+      },
+      setStepSolution: (solution) => {
+        state.stepSolution = solution;
+      },
+    };
+  })();
 
-  class OutputManager {
-    constructor(elementId) {
-      this.element = $(elementId);
-      this.buffer = [];
-    }
-
-    setOutput(text, type = "") {
-      const icons = { ok: "✅ ", warn: "⚠️ ", bad: "❌ " };
-      const header = icons[type] || "";
-      this.buffer = [`${header}${this.escapeHtml(text)}`];
-      this.flush();
-    }
-
-    append(text) {
-      this.buffer.push(this.escapeHtml(text));
-    }
-
-    flush() {
-      this.element.textContent = this.buffer.join("\n");
-      this.element.scrollTop = this.element.scrollHeight;
-    }
-
-    escapeHtml(str) {
-      const div = DOM.create("div");
-      div.textContent = str;
-      return div.innerHTML;
-    }
-  }
-
-  const out = new OutputManager("#output");
-
-  const format = {
-    number: (n) => {
-      if (!Number.isFinite(n)) return String(n);
-      const abs = Math.abs(n);
-      if (abs === 0 || abs < 1e-10) return "0";
-      return String(Math.round(n * 1e8) / 1e8);
-    },
-
-    value: (x) => {
-      if (typeof x === "number") return format.number(x);
-      if (x?.isUnit) return x.toString();
-      if (x?.im !== undefined) {
-        const re = format.number(x.re);
-        const im = format.number(Math.abs(x.im));
-        if (Math.abs(x.im) < 1e-12) return re;
-        if (Math.abs(x.re) < 1e-12) return `${x.im >= 0 ? "" : "-"}${im}i`;
-        return `${re} ${x.im >= 0 ? "+" : "-"} ${im}i`;
+  // =========================================================
+  //  MATH ENGINE - Core Linear Algebra Operations
+  // =========================================================
+  const MathEngine = {
+    /**
+     * Validate matrix dimensions and values
+     */
+    validateMatrix: (matrix, context = "") => {
+      if (!Array.isArray(matrix) || matrix.length === 0) {
+        throw new Error(`${context}: Invalid matrix (empty or not an array)`);
       }
-      if (typeof x === "string") return x;
-      if (x?.valueOf) return String(x.valueOf());
-      return String(x);
-    },
-
-    matrix: (A) => A.map((r) => r.map((v) => format.value(v)).join("\t")).join("\n"),
-  };
-
-  const matrixUtils = {
-    isSquare: (A) => A.length === A[0].length,
-    toNumber: (A) => A.map((r) => r.map((v) => Number(typeof v === "number" ? v : math.number(v)))),
-    clone: (A) => A.map((r) => r.map((v) => math.clone(v))),
-    parseExpr: (s) => {
-      try {
-        return math.evaluate(s);
-      } catch (e) {
-        throw new Error(`Invalid expression: ${s}`);
+      const cols = matrix[0].length;
+      if (!matrix.every((row) => Array.isArray(row) && row.length === cols)) {
+        throw new Error(`${context}: Inconsistent row lengths`);
       }
+      if (!matrix.every((row) => row.every((val) => typeof val === "number" || val === 0))) {
+        throw new Error(`${context}: Non-numeric values detected`);
+      }
+      return true;
     },
-  };
 
-  /* =========================================================
-     Optimized Matrix Algebra Class
-  ========================================================= */
-  class MatrixAlgebra {
-    static rrefWithSteps(A) {
-      const M = matrixUtils.clone(A);
+    /**
+     * Clone a matrix deeply
+     */
+    clone: (matrix) => matrix.map((row) => [...row]),
+
+    /**
+     * Get matrix dimensions
+     */
+    dims: (matrix) => ({
+      rows: matrix.length,
+      cols: matrix[0].length,
+    }),
+
+    /**
+     * Matrix Addition: A + B
+     */
+    add: (A, B) => {
+      MathEngine.validateMatrix(A, "Matrix A (addition)");
+      MathEngine.validateMatrix(B, "Matrix B (addition)");
+
+      const dimA = MathEngine.dims(A);
+      const dimB = MathEngine.dims(B);
+
+      if (dimA.rows !== dimB.rows || dimA.cols !== dimB.cols) {
+        throw new Error(
+          `Dimension mismatch: A is ${dimA.rows}×${dimA.cols}, B is ${dimB.rows}×${dimB.cols}`
+        );
+      }
+
+      return A.map((row, i) => row.map((val, j) => val + B[i][j]));
+    },
+
+    /**
+     * Matrix Subtraction: A - B
+     */
+    subtract: (A, B) => {
+      MathEngine.validateMatrix(A, "Matrix A (subtraction)");
+      MathEngine.validateMatrix(B, "Matrix B (subtraction)");
+
+      const dimA = MathEngine.dims(A);
+      const dimB = MathEngine.dims(B);
+
+      if (dimA.rows !== dimB.rows || dimA.cols !== dimB.cols) {
+        throw new Error(
+          `Dimension mismatch: A is ${dimA.rows}×${dimA.cols}, B is ${dimB.rows}×${dimB.cols}`
+        );
+      }
+
+      return A.map((row, i) => row.map((val, j) => val - B[i][j]));
+    },
+
+    /**
+     * Scalar Multiplication: k * A
+     */
+    scalarMult: (k, A) => {
+      MathEngine.validateMatrix(A, "Matrix A (scalar mult)");
+      return A.map((row) => row.map((val) => k * val));
+    },
+
+    /**
+     * Matrix Multiplication: A × B
+     */
+    multiply: (A, B) => {
+      MathEngine.validateMatrix(A, "Matrix A (multiplication)");
+      MathEngine.validateMatrix(B, "Matrix B (multiplication)");
+
+      const { cols: colsA } = MathEngine.dims(A);
+      const { rows: rowsB, cols: colsB } = MathEngine.dims(B);
+
+      if (colsA !== rowsB) {
+        throw new Error(
+          `Cannot multiply: A columns (${colsA}) ≠ B rows (${rowsB})`
+        );
+      }
+
+      const result = [];
+      for (let i = 0; i < A.length; i++) {
+        result[i] = [];
+        for (let j = 0; j < colsB; j++) {
+          let sum = 0;
+          for (let k = 0; k < colsA; k++) {
+            sum += A[i][k] * B[k][j];
+          }
+          result[i][j] = MathEngine.round(sum);
+        }
+      }
+      return result;
+    },
+
+    /**
+     * Matrix Transpose: A^T
+     */
+    transpose: (A) => {
+      MathEngine.validateMatrix(A, "Matrix A (transpose)");
+      const rows = A.length;
+      const cols = A[0].length;
+      const result = [];
+      for (let j = 0; j < cols; j++) {
+        result[j] = [];
+        for (let i = 0; i < rows; i++) {
+          result[j][i] = A[i][j];
+        }
+      }
+      return result;
+    },
+
+    /**
+     * Matrix Trace: sum of diagonal elements
+     */
+    trace: (A) => {
+      MathEngine.validateMatrix(A, "Matrix A (trace)");
+      const { rows, cols } = MathEngine.dims(A);
+      if (rows !== cols) {
+        throw new Error(`Trace requires square matrix, got ${rows}×${cols}`);
+      }
+      return A.reduce((sum, row, i) => sum + row[i], 0);
+    },
+
+    /**
+     * Determinant (2×2 and 3×3 with Laplace expansion for larger)
+     */
+    determinant: (A) => {
+      MathEngine.validateMatrix(A, "Matrix A (determinant)");
+      const { rows, cols } = MathEngine.dims(A);
+
+      if (rows !== cols) {
+        throw new Error(
+          `Determinant requires square matrix, got ${rows}×${cols}`
+        );
+      }
+
+      if (rows === 1) return A[0][0];
+      if (rows === 2) {
+        return A[0][0] * A[1][1] - A[0][1] * A[1][0];
+      }
+      if (rows === 3) {
+        return (
+          A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1]) -
+          A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0]) +
+          A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0])
+        );
+      }
+
+      // Laplace expansion along first row (for larger matrices)
+      let det = 0;
+      for (let j = 0; j < cols; j++) {
+        const minor = MathEngine._getMinor(A, 0, j);
+        const cofactor = Math.pow(-1, j) * MathEngine.determinant(minor);
+        det += A[0][j] * cofactor;
+      }
+      return MathEngine.round(det);
+    },
+
+    /**
+     * Get minor matrix (for determinant calculation)
+     */
+    _getMinor: (A, row, col) => {
+      return A.filter((_, i) => i !== row).map((r) =>
+        r.filter((_, j) => j !== col)
+      );
+    },
+
+    /**
+     * Matrix Inverse: A^(-1) using Gauss-Jordan elimination
+     */
+    inverse: (A) => {
+      MathEngine.validateMatrix(A, "Matrix A (inverse)");
+      const { rows, cols } = MathEngine.dims(A);
+
+      if (rows !== cols) {
+        throw new Error(
+          `Inverse requires square matrix, got ${rows}×${cols}`
+        );
+      }
+
+      const det = MathEngine.determinant(A);
+      if (Math.abs(det) < 1e-10) {
+        throw new Error(
+          `Matrix is singular (det ≈ 0), inverse does not exist`
+        );
+      }
+
+      // Augment [A | I]
+      const n = rows;
+      const aug = A.map((row, i) => {
+        const identity = Array(n).fill(0);
+        identity[i] = 1;
+        return [...row, ...identity];
+      });
+
+      // Gauss-Jordan elimination
+      for (let i = 0; i < n; i++) {
+        // Find pivot
+        let maxRow = i;
+        for (let k = i + 1; k < n; k++) {
+          if (Math.abs(aug[k][i]) > Math.abs(aug[maxRow][i])) {
+            maxRow = k;
+          }
+        }
+
+        // Swap rows
+        [aug[i], aug[maxRow]] = [aug[maxRow], aug[i]];
+
+        // Scale pivot row
+        const pivot = aug[i][i];
+        if (Math.abs(pivot) < 1e-10) {
+          throw new Error(`Singular matrix encountered during inversion`);
+        }
+
+        for (let j = 0; j < 2 * n; j++) {
+          aug[i][j] /= pivot;
+        }
+
+        // Eliminate column
+        for (let k = 0; k < n; k++) {
+          if (k !== i) {
+            const factor = aug[k][i];
+            for (let j = 0; j < 2 * n; j++) {
+              aug[k][j] -= factor * aug[i][j];
+            }
+          }
+        }
+      }
+
+      // Extract inverse from right half
+      return aug.map((row) => row.slice(n).map((val) => MathEngine.round(val)));
+    },
+
+    /**
+     * Gaussian Elimination with Partial Pivoting for solving Ax = b
+     */
+    gaussianElimination: (A, b) => {
+      MathEngine.validateMatrix(A, "Matrix A");
+      if (!Array.isArray(b) || !b.every((v) => typeof v === "number")) {
+        throw new Error("Vector b must be array of numbers");
+      }
+
+      const { rows, cols } = MathEngine.dims(A);
+      if (rows !== b.length) {
+        throw new Error(
+          `Dimension mismatch: A has ${rows} rows, b has ${b.length} elements`
+        );
+      }
+
+      // Create augmented matrix [A | b]
+      const aug = A.map((row, i) => [...row, b[i]]);
+      const n = rows;
+      const steps = { forward: [], backward: [], solution: null };
+
+      // ===== FORWARD ELIMINATION =====
+      for (let i = 0; i < n; i++) {
+        // Find pivot by partial pivoting
+        let maxRow = i;
+        for (let k = i + 1; k < n; k++) {
+          if (Math.abs(aug[k][i]) > Math.abs(aug[maxRow][i])) {
+            maxRow = k;
+          }
+        }
+
+        // Swap rows if needed
+        if (maxRow !== i) {
+          [aug[i], aug[maxRow]] = [aug[maxRow], aug[i]];
+        }
+
+        // Check for singular matrix
+        if (Math.abs(aug[i][i]) < 1e-10) {
+          throw new Error(
+            `Singular matrix at step ${i + 1}: coefficient is zero`
+          );
+        }
+
+        // Eliminate below
+        for (let k = i + 1; k < n; k++) {
+          const factor = aug[k][i] / aug[i][i];
+          for (let j = i; j <= n; j++) {
+            aug[k][j] -= factor * aug[i][j];
+          }
+        }
+      }
+
+      // ===== BACK SUBSTITUTION =====
+      const x = Array(n);
+      for (let i = n - 1; i >= 0; i--) {
+        let sum = aug[i][n];
+        for (let j = i + 1; j < n; j++) {
+          sum -= aug[i][j] * x[j];
+        }
+        x[i] = sum / aug[i][i];
+      }
+
+      return {
+        solution: x.map((v) => MathEngine.round(v)),
+        augmented: aug,
+      };
+    },
+
+    /**
+     * RREF (Reduced Row Echelon Form) for rank and null space
+     */
+    rref: (A) => {
+      MathEngine.validateMatrix(A, "Matrix A (RREF)");
+      const M = MathEngine.clone(A);
       const rows = M.length;
       const cols = M[0].length;
-      const steps = [];
+
       let lead = 0;
-
-      const snap = (msg) => {
-        steps.push(`${msg}\n${format.matrix(M)}`);
-      };
-
-      snap("Start:");
-
       for (let r = 0; r < rows; r++) {
-        if (lead >= cols) break;
+        if (lead >= cols) return M;
 
         let i = r;
-        while (i < rows && math.equal(M[i][lead], 0)) i++;
-
-        if (i === rows) {
-          lead++;
-          r--;
-          continue;
-        }
-
-        if (i !== r) {
-          [M[i], M[r]] = [M[r], M[i]];
-          snap(`Swap R${i + 1} ↔ R${r + 1}:`);
-        }
-
-        const lv = M[r][lead];
-        if (!math.equal(lv, 1)) {
-          for (let j = 0; j < cols; j++) {
-            M[r][j] = math.divide(M[r][j], lv);
+        while (Math.abs(M[i][lead]) < 1e-10) {
+          i++;
+          if (i === rows) {
+            i = r;
+            lead++;
+            if (lead === cols) return M;
           }
-          snap(`Scale R${r + 1} ÷ (${format.value(lv)}):`);
         }
 
-        for (let i2 = 0; i2 < rows; i2++) {
-          if (i2 === r) continue;
-          const lv2 = M[i2][lead];
-          if (!math.equal(lv2, 0)) {
+        [M[i], M[r]] = [M[r], M[i]];
+
+        const div = M[r][lead];
+        for (let j = 0; j < cols; j++) {
+          M[r][j] /= div;
+        }
+
+        for (let i = 0; i < rows; i++) {
+          if (i !== r) {
+            const mult = M[i][lead];
             for (let j = 0; j < cols; j++) {
-              M[i2][j] = math.subtract(M[i2][j], math.multiply(lv2, M[r][j]));
+              M[i][j] -= mult * M[r][j];
             }
-            snap(`R${i2 + 1} ← R${i2 + 1} − (${format.value(lv2)})·R${r + 1}:`);
           }
         }
-
         lead++;
       }
 
-      return { RREF: M, steps };
-    }
+      return M;
+    },
 
-    static gaussEliminationSteps(A, b) {
-      const M = A.map((row, i) => row.concat([b[i]]).map((v) => math.clone(v)));
-      const n = M.length;
-      const m = M[0].length;
-      const steps = [];
-
-      const snap = (msg) => {
-        steps.push(`${msg}\n${format.matrix(M)}`);
-      };
-
-      snap("Start (Augmented [A|b]):");
-
-      for (let k = 0; k < n; k++) {
-        let piv = k;
-        for (let i = k; i < n; i++) {
-          if (!math.equal(M[i][k], 0)) {
-            piv = i;
-            break;
-          }
-        }
-
-        if (math.equal(M[piv][k], 0)) {
-          snap(`Pivot in column ${k + 1} is zero → skip.`);
-          continue;
-        }
-
-        if (piv !== k) {
-          [M[piv], M[k]] = [M[k], M[piv]];
-          snap(`Swap R${piv + 1} ↔ R${k + 1}:`);
-        }
-
-        for (let i = k + 1; i < n; i++) {
-          if (math.equal(M[i][k], 0)) continue;
-          const factor = math.divide(M[i][k], M[k][k]);
-          for (let j = k; j < m; j++) {
-            M[i][j] = math.subtract(M[i][j], math.multiply(factor, M[k][j]));
-          }
-          snap(`R${i + 1} ← R${i + 1} − (${format.value(factor)})·R${k + 1}:`);
-        }
-      }
-
-      const x = Array(n).fill(0);
-      for (let i = n - 1; i >= 0; i--) {
-        let lead = -1;
-        for (let j = 0; j < n; j++) {
-          if (!math.equal(M[i][j], 0)) {
-            lead = j;
-            break;
-          }
-        }
-
-        if (lead === -1) {
-          if (!math.equal(M[i][n], 0)) {
-            return { steps, solution: null, status: "inconsistent", augmented: M };
-          }
-          continue;
-        }
-
-        let sum = 0;
-        for (let j = lead + 1; j < n; j++) {
-          sum = math.add(sum, math.multiply(M[i][j], x[j]));
-        }
-        x[lead] = math.divide(math.subtract(M[i][n], sum), M[i][lead]);
-      }
-
-      return { steps, solution: x, status: "ok", augmented: M };
-    }
-
-    static rankOf(A) {
-      const { RREF } = this.rrefWithSteps(A);
+    /**
+     * Calculate matrix rank
+     */
+    rank: (A) => {
+      MathEngine.validateMatrix(A, "Matrix A (rank)");
+      const rrefMatrix = MathEngine.rref(A);
       let rank = 0;
-      for (const row of RREF) {
-        if (!row.every((v) => math.equal(v, 0))) rank++;
+      for (const row of rrefMatrix) {
+        if (!row.every((v) => Math.abs(v) < 1e-10)) {
+          rank++;
+        }
       }
       return rank;
-    }
+    },
 
-    static nullSpaceBasis(A) {
-      const { RREF } = this.rrefWithSteps(A);
-      const m = RREF.length;
-      const n = RREF[0].length;
+    /**
+     * Utility: round to 10 decimal places
+     */
+    round: (val) => {
+      return Math.abs(val) < 1e-10 ? 0 : Math.round(val * 1e10) / 1e10;
+    },
+  };
 
-      const pivots = [];
-      for (let i = 0; i < m; i++) {
-        for (let j = 0; j < n; j++) {
-          if (!math.equal(RREF[i][j], 0)) {
-            pivots.push(j);
-            break;
-          }
-        }
-      }
+  // =========================================================
+  //  LATEX FORMATTER - Output Rendering
+  // =========================================================
+  const LatexFormatter = {
+    /**
+     * Format matrix as LaTeX
+     */
+    matrix: (M, inline = false) => {
+      if (!M || M.length === 0) return "\\text{empty}";
+      const rows = M.map((row) =>
+        row
+          .map((v) => {
+            const str = typeof v === "number" ? v.toFixed(4).replace(/0+$/, "").replace(/\.$/, "") : String(v);
+            return str;
+          })
+          .join(" & ")
+      ).join(" \\\\ ");
+      return inline ? `\\begin{bmatrix} ${rows} \\end{bmatrix}` : `\\[\\begin{bmatrix} ${rows} \\end{bmatrix}\\]`;
+    },
 
-      const pivotSet = new Set(pivots);
-      const freeCols = Array.from({ length: n }, (_, j) => j).filter((j) => !pivotSet.has(j));
+    /**
+     * Format vector as LaTeX
+     */
+    vector: (v) => {
+      if (!Array.isArray(v)) return "\\text{invalid}";
+      const elements = v
+        .map((x) => {
+          const str = typeof x === "number" ? x.toFixed(4).replace(/0+$/, "").replace(/\.$/, "") : String(x);
+          return str;
+        })
+        .join(" \\\\ ");
+      return `\\begin{bmatrix} ${elements} \\end{bmatrix}`;
+    },
 
-      if (freeCols.length === 0) {
-        return { basis: [], note: "Only trivial null space (full column rank)." };
-      }
+    /**
+     * Format equation
+     */
+    equation: (left, right) => {
+      return `\\[${left} = ${right}\\]`;
+    },
 
-      const basis = freeCols.map((free) => {
-        const v = Array(n).fill(0);
-        v[free] = 1;
+    /**
+     * Format scalar result
+     */
+    scalar: (value) => {
+      const str = typeof value === "number" ? value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "") : String(value);
+      return `\\[${str}\\]`;
+    },
+  };
 
-        for (let i = 0; i < m; i++) {
-          let p = -1;
-          for (let j = 0; j < n; j++) {
-            if (!math.equal(RREF[i][j], 0)) {
-              p = j;
-              break;
+  // =========================================================
+  //  UI CONTROLLER - Manage DOM and Interactions
+  // =========================================================
+  const UIController = (() => {
+    const DOM = {
+      select: (sel) => document.querySelector(sel),
+      selectAll: (sel) => document.querySelectorAll(sel),
+      create: (tag) => document.createElement(tag),
+    };
+
+    return {
+      /**
+       * Display result with LaTeX rendering
+       */
+      showResult: (title, latexContent, html = "") => {
+        const output = DOM.select("#output");
+        const resultHTML = `
+          <div class="result-block">
+            <div class="result-title">${title}</div>
+            <div class="result-latex">${latexContent}</div>
+            ${html ? `<div class="result-extra">${html}</div>` : ""}
+          </div>
+        `;
+        output.innerHTML += resultHTML;
+        output.scrollTop = output.scrollHeight;
+
+        // Render LaTeX if KaTeX is available
+        if (window.katex && window.katex.render) {
+          const latexBlocks = output.querySelectorAll(".result-latex");
+          latexBlocks.forEach((block) => {
+            try {
+              window.katex.render(block.textContent, block, { throwOnError: false });
+            } catch (e) {
+              console.warn("KaTeX render error:", e);
             }
+          });
+        }
+      },
+
+      /**
+       * Clear output panel
+       */
+      clearOutput: () => {
+        const output = DOM.select("#output");
+        output.innerHTML = "";
+      },
+
+      /**
+       * Show error message
+       */
+      showError: (message) => {
+        const output = DOM.select("#output");
+        const errorHTML = `<div class="error-message">❌ ${message}</div>`;
+        output.innerHTML = errorHTML;
+      },
+
+      /**
+       * Read matrix from grid
+       */
+      readMatrixGrid: (gridId) => {
+        const grid = DOM.select(`#${gridId}`);
+        const inputs = grid.querySelectorAll("input");
+        const cols = parseInt(grid.style.gridTemplateColumns?.match(/\d+/)?.[0]) || 3;
+
+        const matrix = [];
+        for (let i = 0; i < inputs.length; i += cols) {
+          const row = Array.from(inputs.slice(i, i + cols)).map((inp) => {
+            const val = parseFloat(inp.value);
+            if (isNaN(val)) throw new Error(`Non-numeric value: ${inp.value}`);
+            return val;
+          });
+          matrix.push(row);
+        }
+        return matrix;
+      },
+
+      /**
+       * Write matrix to grid
+       */
+      writeMatrixGrid: (gridId, matrix, cols = null) => {
+        const grid = DOM.select(`#${gridId}`);
+        if (!matrix) return;
+
+        cols = cols || matrix[0].length;
+        grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        grid.innerHTML = "";
+
+        for (const row of matrix) {
+          for (const val of row) {
+            const inp = DOM.create("input");
+            inp.type = "number";
+            inp.className = "cell";
+            inp.value = typeof val === "number" ? val.toFixed(2) : val;
+            grid.appendChild(inp);
           }
-          if (p > -1) {
-            v[p] = math.multiply(-1, RREF[i][free]);
-          }
         }
-        return v;
-      });
+      },
 
-      return { basis, note: `Found ${basis.length} basis vector(s) for Null(A).` };
-    }
-
-    static rowSpaceBasis(A) {
-      const { RREF } = this.rrefWithSteps(A);
-      return RREF.filter((row) => !row.every((v) => math.equal(v, 0)));
-    }
-
-    static eigenSolve(A) {
-      if (!matrixUtils.isSquare(A)) {
-        throw new Error("Eigenvalues require a square matrix.");
-      }
-
-      if (typeof math.eigs === "function") {
-        try {
-          const M = math.matrix(A);
-          const res = math.eigs(M);
-          return { mode: "mathjs", values: res.values, vectors: res.vectors };
-        } catch (e) {
-          // Fallback to 2×2
-        }
-      }
-
-      if (A.length === 2) {
-        const [a, b, c, d] = [A[0][0], A[0][1], A[1][0], A[1][1]];
-        const tr = math.add(a, d);
-        const det = math.subtract(math.multiply(a, d), math.multiply(b, c));
-        const disc = math.subtract(math.multiply(tr, tr), math.multiply(4, det));
-        const sqrtDisc = math.sqrt(disc);
-        const lam1 = math.divide(math.add(tr, sqrtDisc), 2);
-        const lam2 = math.divide(math.subtract(tr, sqrtDisc), 2);
-
-        const eigvec = (lam) => {
-          const m11 = math.subtract(a, lam);
-          if (!math.equal(b, 0) || !math.equal(m11, 0)) {
-            return [b, math.subtract(lam, a)];
-          }
-          return [math.subtract(lam, d), c];
-        };
-
-        return { mode: "2x2", values: [lam1, lam2], vectors: [eigvec(lam1), eigvec(lam2)] };
-      }
-
-      throw new Error("Eigenvalues: requires 2×2 or math.eigs library support.");
-    }
-  }
-
-  // Plotting functions
-  function plot2DTransform(A2) {
-    const A = matrixUtils.toNumber(A2);
-    const pts = [];
-    for (let x = -3; x <= 3; x++) {
-      for (let y = -3; y <= 3; y++) {
-        pts.push([x, y]);
-      }
-    }
-
-    const after = pts.map((p) => [A[0][0] * p[0] + A[0][1] * p[1], A[1][0] * p[0] + A[1][1] * p[1]]);
-
-    const data = [
-      { x: pts.map((p) => p[0]), y: pts.map((p) => p[1]), mode: "markers", type: "scatter", name: "Before", marker: { size: 6 } },
-      { x: after.map((p) => p[0]), y: after.map((p) => p[1]), mode: "markers", type: "scatter", name: "After", marker: { size: 6 } },
-    ];
-
-    const layout = {
-      title: "2D Linear Transformation",
-      xaxis: { title: "x", zeroline: true },
-      yaxis: { title: "y", zeroline: true, scaleanchor: "x", scaleratio: 1 },
-      margin: { l: 50, r: 20, t: 50, b: 45 },
-      legend: { orientation: "h" },
-    };
-
-    $("#plot").style.display = "block";
-    Plotly.newPlot("plot", data, layout, { responsive: true });
-  }
-
-  function plot4DTransformProjections(A4) {
-    const A = matrixUtils.toNumber(A4);
-    const pts = [];
-    for (const x of [-2, -1, 0, 1, 2]) {
-      for (const y of [-2, -1, 0, 1, 2]) {
-        for (const z of [-2, 0, 2]) {
-          pts.push([x, y, z, 0]);
-        }
-      }
-    }
-
-    const matVecMul = (M, v) => {
-      const r = [0, 0, 0, 0];
-      for (let i = 0; i < 4; i++) {
-        let s = 0;
-        for (let j = 0; j < 4; j++) {
-          s += M[i][j] * v[j];
-        }
-        r[i] = s;
-      }
-      return r;
-    };
-
-    const after = pts.map((v) => matVecMul(A, v));
-
-    const data = [
-      { x: pts.map((p) => p[0]), y: pts.map((p) => p[1]), mode: "markers", type: "scatter", name: "XY Before", marker: { size: 5 } },
-      { x: after.map((p) => p[0]), y: after.map((p) => p[1]), mode: "markers", type: "scatter", name: "XY After", marker: { size: 5 } },
-      { x: pts.map((p) => p[2]), y: pts.map((p) => p[3]), mode: "markers", type: "scatter", name: "ZW Before", marker: { size: 5 } },
-      { x: after.map((p) => p[2]), y: after.map((p) => p[3]), mode: "markers", type: "scatter", name: "ZW After", marker: { size: 5 } },
-    ];
-
-    const layout = {
-      title: "4D Transformation Projections",
-      xaxis: { title: "X/Z Axis" },
-      yaxis: { title: "Y/W Axis" },
-      margin: { l: 50, r: 20, t: 50, b: 45 },
-      legend: { orientation: "h" },
-    };
-
-    $("#plot").style.display = "block";
-    Plotly.newPlot("plot", data, layout, { responsive: true });
-  }
-
-  /* =========================================================
-     Optimized Matrix Editor Component
-  ========================================================= */
-  function createMatrixEditor(container, idPrefix, r = 3, c = 3, label = "Matrix") {
-    const root = DOM.create("div");
-
-    root.innerHTML = `
-      <div class="row" style="justify-content:space-between; align-items:flex-end;">
-        <div>
-          <div class="sectionTitle">${label}</div>
-          <div class="hint mini">Type numbers/expressions. Paste block with rows separated by newlines.</div>
-        </div>
-        <div class="row">
-          <label>Rows</label><input type="number" min="1" max="8" value="${r}" id="${idPrefix}_r" style="width:88px">
-          <label>Cols</label><input type="number" min="1" max="8" value="${c}" id="${idPrefix}_c" style="width:88px">
-          <button id="${idPrefix}_resize">Resize</button>
-        </div>
-      </div>
-      <div class="divider"></div>
-      <div class="row">
-        <button id="${idPrefix}_pasteBtn">Paste → Grid</button>
-        <button id="${idPrefix}_gridToText">Grid → Text</button>
-        <button id="${idPrefix}_textToGrid">Text → Grid</button>
-      </div>
-      <textarea id="${idPrefix}_text" placeholder="Paste matrix here"></textarea>
-      <div class="divider"></div>
-      <div class="matrixWrap">
-        <div class="matrixGrid" id="${idPrefix}_grid"></div>
-      </div>
-    `;
-    container.appendChild(root);
-
-    const rInp = root.querySelector(`#${idPrefix}_r`);
-    const cInp = root.querySelector(`#${idPrefix}_c`);
-    const grid = root.querySelector(`#${idPrefix}_grid`);
-    const text = root.querySelector(`#${idPrefix}_text`);
-
-    const buildGrid = (rr, cc, oldValues = null) => {
-      grid.style.gridTemplateColumns = `repeat(${cc}, 74px)`;
-      const fragment = document.createDocumentFragment();
-      for (let i = 0; i < rr; i++) {
-        for (let j = 0; j < cc; j++) {
-          const inp = DOM.create("input");
-          inp.className = "cell";
-          inp.type = "text";
-          inp.placeholder = "0";
-          inp.value = oldValues?.[i]?.[j] ?? "";
-          inp.dataset.r = i;
-          inp.dataset.c = j;
-          fragment.appendChild(inp);
-        }
-      }
-      grid.innerHTML = "";
-      grid.appendChild(fragment);
-    };
-
-    const readGrid = () => {
-      const rr = Number(rInp.value);
-      const cc = Number(cInp.value);
-      const A = Array.from({ length: rr }, () => Array(cc).fill(0));
-
-      grid.querySelectorAll("input.cell").forEach((cell) => {
-        const i = Number(cell.dataset.r);
-        const j = Number(cell.dataset.c);
-        const val = cell.value.trim();
-        A[i][j] = val ? matrixUtils.parseExpr(val) : 0;
-      });
-      return A;
-    };
-
-    const writeGrid = (A) => {
-      rInp.value = A.length;
-      cInp.value = A[0].length;
-      buildGrid(A.length, A[0].length, A.map((r) => r.map((v) => String(v))));
-    };
-
-    const parseBlockToMatrix = (block) => {
-      const lines = block
-        .trim()
-        .split(/\n+/)
-        .map((l) => l.trim())
-        .filter(Boolean);
-      const rows = lines.map((line) => line.split(/[\s,;]+/).filter(Boolean));
-      const rr = rows.length;
-      const cc = Math.max(...rows.map((r) => r.length), 1);
-      return Array.from({ length: rr }, (_, i) => Array.from({ length: cc }, (_, j) => rows[i]?.[j] ?? "0"));
-    };
-
-    root.querySelector(`#${idPrefix}_resize`).onclick = () => {
-      const rr = Number(rInp.value);
-      const cc = Number(cInp.value);
-      const old = readGrid().map((r) => r.map((v) => (v === 0 ? "" : format.value(v))));
-      const vals = Array.from({ length: rr }, (_, i) => Array.from({ length: cc }, (_, j) => old[i]?.[j] ?? ""));
-      buildGrid(rr, cc, vals);
-    };
-
-    root.querySelector(`#${idPrefix}_pasteBtn`).onclick = () => {
-      text.focus();
-      document.execCommand("paste");
-    };
-
-    root.querySelector(`#${idPrefix}_textToGrid`).onclick = () => {
-      try {
-        const Araw = parseBlockToMatrix(text.value);
-        writeGrid(Araw);
-        out.setOutput("✅ Loaded text → grid", "ok");
-      } catch (e) {
-        out.setOutput(`Text → grid failed: ${e.message}`, "bad");
-      }
-    };
-
-    root.querySelector(`#${idPrefix}_gridToText`).onclick = () => {
-      try {
-        const A = readGrid();
-        text.value = format.matrix(A);
-        out.setOutput("✅ Exported grid → text", "ok");
-      } catch (e) {
-        out.setOutput(`Grid → text failed: ${e.message}`, "bad");
-      }
-    };
-
-    buildGrid(r, c);
-    return { readGrid, writeGrid, getText: () => text.value, setText: (v) => (text.value = v), root };
-  }
-
-  /* =========================================================
-     Tab System
-  ========================================================= */
-  const TABS = [
-    { id: "equations", label: "Linear Equations", build: buildEquations },
-    { id: "matops", label: "Matrix Ops", build: buildMatrixOps },
-    { id: "vectors", label: "Vectors & Spaces", build: buildVectors },
-    { id: "eigen", label: "Eigen", build: buildEigen },
-    { id: "transform", label: "Linear Transform", build: buildTransform },
-  ];
-
-  function setActiveTab(id) {
-    DOM.selectAll(".tabBtn").forEach((b) => {
-      b.classList.toggle("active", b.dataset.id === id);
-    });
-    const tab = TABS.find((t) => t.id === id);
-    $("#panelTitle").textContent = tab.label;
-    $("#panelBody").innerHTML = "";
-    $("#plot").style.display = "none";
-    tab.build($("#panelBody"));
-    out.setOutput(`Opened: ${tab.label}`, "ok");
-  }
-
-  (function initTabs() {
-    const tabs = $("#tabs");
-    TABS.forEach((t) => {
-      const b = DOM.create("div");
-      b.className = "tabBtn";
-      b.textContent = t.label;
-      b.dataset.id = t.id;
-      b.onclick = () => setActiveTab(t.id);
-      tabs.appendChild(b);
-    });
-    setActiveTab("equations");
-  })();
-
-  /* =========================================================
-     Tab Builders
-  ========================================================= */
-  let eqAEditor, eqbEditor, AEditor, BEditor, VS_Editor, E_Editor, T2_Editor, T4_Editor;
-
-  function buildEquations(root) {
-    root.innerHTML = `
-      <div class="grid2">
-        <div class="card" style="box-shadow:none; border:none; background:transparent;">
-          <div class="pad" style="padding:0;">
-            <div id="eqA"></div>
-            <div class="divider"></div>
-            <div class="sectionTitle">Vector b</div>
-            <div id="eqb"></div>
-            <div class="divider"></div>
-            <div class="row">
-              <button class="primary" id="btnSolveGauss">Solve (Gauss)</button>
-              <button class="primary" id="btnSolveGJ">Solve (Gauss-Jordan)</button>
-              <button id="btnShowRREFAug">Show RREF</button>
-              <button id="btnCramer">Cramer's Rule</button>
+      /**
+       * Create matrix editor UI
+       */
+      createMatrixEditor: (container, idPrefix, rows = 3, cols = 3, label = "Matrix") => {
+        const wrapper = DOM.create("div");
+        wrapper.className = "matrix-editor";
+        wrapper.innerHTML = `
+          <div class="matrix-header">
+            <h3>${label}</h3>
+            <div class="matrix-controls">
+              <label>Rows: <input type="number" class="dim-input" min="1" max="10" value="${rows}" data-dim="rows" data-prefix="${idPrefix}"></label>
+              <label>Cols: <input type="number" class="dim-input" min="1" max="10" value="${cols}" data-dim="cols" data-prefix="${idPrefix}"></label>
+              <button class="resize-btn" data-prefix="${idPrefix}">Resize</button>
             </div>
           </div>
-        </div>
-        <div>
-          <div class="sectionTitle">How to use</div>
-          <div class="hint">Solve <b>A x = b</b> using three methods. Try expressions like <span class="mono">1/2</span> or <span class="mono">sqrt(2)</span>.</div>
-        </div>
-      </div>
-    `;
+          <div class="matrix-grid" id="${idPrefix}_grid"></div>
+        `;
 
-    eqAEditor = createMatrixEditor(root.querySelector("#eqA"), "eqA", 3, 3, "Matrix A");
-    eqbEditor = createMatrixEditor(root.querySelector("#eqb"), "eqb", 3, 1, "b");
+        container.appendChild(wrapper);
 
-    $("#btnSolveGauss").onclick = () => {
-      try {
-        const A = eqAEditor.readGrid();
-        const b = eqbEditor.readGrid().map((r) => r[0]);
-        if (A.length !== b.length) throw new Error("Dimension mismatch: rows of A must equal length of b.");
+        // Initialize grid
+        UIController.buildMatrixGrid(idPrefix, rows, cols);
 
-        const res = MatrixAlgebra.gaussEliminationSteps(A, b);
-        out.setOutput("Gauss Elimination with Back Substitution", "ok");
-        out.append(res.steps.join("\n\n"));
-        out.append("\n---\nResult:");
+        // Resize handler
+        wrapper.querySelector(".resize-btn").onclick = () => {
+          const newRows = parseInt(wrapper.querySelector(`[data-dim="rows"]`).value);
+          const newCols = parseInt(wrapper.querySelector(`[data-dim="cols"]`).value);
+          UIController.buildMatrixGrid(idPrefix, newRows, newCols);
+        };
 
-        if (res.status === "inconsistent") {
-          out.append("❌ System is inconsistent (no solution)");
-        } else if (!res.solution) {
-          out.append("⚠️ Infinitely many solutions (free variables)");
-        } else {
-          out.append(`✅ Solution: x = [${res.solution.map(format.value).join(", ")}]ᵀ`);
+        return { readGrid: () => UIController.readMatrixGrid(`${idPrefix}_grid`) };
+      },
+
+      /**
+       * Build matrix grid
+       */
+      buildMatrixGrid: (idPrefix, rows, cols) => {
+        const grid = DOM.select(`#${idPrefix}_grid`);
+        grid.innerHTML = "";
+        grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+        for (let i = 0; i < rows * cols; i++) {
+          const inp = DOM.create("input");
+          inp.type = "number";
+          inp.className = "cell";
+          inp.placeholder = "0";
+          inp.value = "0";
+          grid.appendChild(inp);
         }
-        out.flush();
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
+      },
     };
+  })();
 
-    $("#btnSolveGJ").onclick = () => {
-      try {
-        const A = eqAEditor.readGrid();
-        const b = eqbEditor.readGrid().map((r) => r[0]);
-        if (A.length !== b.length) throw new Error("Dimension mismatch.");
+  // =========================================================
+  //  TAB BUILDERS - Each operation module
+  // =========================================================
 
-        const Aug = A.map((row, i) => row.concat([b[i]]));
-        const { RREF, steps } = MatrixAlgebra.rrefWithSteps(Aug);
-        out.setOutput("Gauss-Jordan (RREF) Method", "ok");
-        out.append(steps.join("\n\n"));
-        out.append("\n---\nFinal RREF:\n" + format.matrix(RREF));
+  /**
+   * Linear Equations Solver
+   */
+  function buildEquations(root) {
+    UIController.clearOutput();
 
-        const n = A[0].length;
-        let inconsistent = false;
-        for (const row of RREF) {
-          const left = row.slice(0, n);
-          if (left.every((v) => math.equal(v, 0)) && !math.equal(row[n], 0)) {
-            inconsistent = true;
-          }
-        }
-
-        if (inconsistent) {
-          out.append("\n❌ Inconsistent: no solution");
-        } else if (A.length === n) {
-          const detA = math.det(math.matrix(A));
-          if (!math.equal(detA, 0)) {
-            const x = math.lusolve(math.matrix(A), math.matrix(b));
-            out.append(`\n✅ Unique solution: x = [${x.toArray().map(format.value).join(", ")}]ᵀ`);
-          }
-        }
-        out.flush();
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
-
-    $("#btnShowRREFAug").onclick = () => {
-      try {
-        const A = eqAEditor.readGrid();
-        const b = eqbEditor.readGrid().map((r) => r[0]);
-        const Aug = A.map((row, i) => row.concat([b[i]]));
-        const { RREF } = MatrixAlgebra.rrefWithSteps(Aug);
-        out.setOutput(`RREF([A|b]):\n${format.matrix(RREF)}`, "ok");
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
-
-    $("#btnCramer").onclick = () => {
-      try {
-        const A = eqAEditor.readGrid();
-        const b = eqbEditor.readGrid().map((r) => r[0]);
-
-        if (!matrixUtils.isSquare(A)) throw new Error("Cramer's Rule requires square A.");
-        if (A.length !== b.length) throw new Error("Dimension mismatch.");
-
-        const detA = math.det(math.matrix(A));
-        out.setOutput(`Cramer's Rule: det(A) = ${format.value(detA)}`, "ok");
-
-        if (math.equal(detA, 0)) {
-          out.append("❌ det(A) = 0: no unique solution");
-        } else {
-          const n = A.length;
-          const x = [];
-          for (let j = 0; j < n; j++) {
-            const Aj = A.map((row, i) => row.map((v, k) => (k === j ? b[i] : v)));
-            const detAj = math.det(math.matrix(Aj));
-            x[j] = math.divide(detAj, detA);
-            out.append(`det(A${j + 1}) = ${format.value(detAj)}  ⟹  x${j + 1} = ${format.value(x[j])}`);
-          }
-          out.append(`\n✅ Solution: x = [${x.map(format.value).join(", ")}]ᵀ`);
-        }
-        out.flush();
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
-  }
-
-  function buildMatrixOps(root) {
     root.innerHTML = `
-      <div class="grid2">
-        <div>
-          <div id="mA"></div>
-          <div class="divider"></div>
-          <div id="mB"></div>
-        </div>
-        <div>
-          <div class="sectionTitle">Operations</div>
-          <div class="row">
-            <button class="primary" id="btnTranspose">Transpose(A)</button>
-            <button class="primary" id="btnDet">det(A)</button>
-            <button class="primary" id="btnInv">inv(A)</button>
-            <button class="primary" id="btnRREF_A">RREF(A)</button>
-            <button id="btnRankA">rank(A)</button>
-          </div>
-          <div class="divider"></div>
-          <div class="sectionTitle">Multiplication</div>
-          <div class="row">
-            <button class="primary" id="btnAxB">A × B</button>
-            <button class="primary" id="btnBxA">B × A</button>
-          </div>
-          <div class="divider"></div>
-          <div class="sectionTitle">Extra</div>
-          <div class="row">
-            <button id="btnATimesScalar">k·A</button>
-            <input type="text" id="scalarK" placeholder="k (e.g. 2, -1/3)" style="width:220px">
-            <button id="btnTrace">trace(A)</button>
+      <div class="operations-panel">
+        <div class="operation-section">
+          <h3>Solve Linear System Ax = b</h3>
+          <div id="eq-a-editor"></div>
+          <div id="eq-b-editor"></div>
+          <div class="button-group">
+            <button class="btn-primary" onclick="window.solveSysGauss()">Solve (Gaussian Elimination)</button>
+            <button class="btn-secondary" onclick="window.solveViaCramer()">Solve (Cramer's Rule)</button>
           </div>
         </div>
       </div>
     `;
 
-    AEditor = createMatrixEditor(root.querySelector("#mA"), "mAed", 3, 3, "Matrix A");
-    BEditor = createMatrixEditor(root.querySelector("#mB"), "mBed", 3, 3, "Matrix B");
+    const aEditor = UIController.createMatrixEditor(root.querySelector("#eq-a-editor"), "eqA", 3, 3, "Matrix A");
+    const bEditor = UIController.createMatrixEditor(root.querySelector("#eq-b-editor"), "eqb", 3, 1, "Vector b");
 
-    $("#btnTranspose").onclick = () => {
+    window.solveSysGauss = () => {
       try {
-        const A = AEditor.readGrid();
-        const AT = math.transpose(math.matrix(A)).toArray();
-        out.setOutput(`Transpose(A):\n${format.matrix(AT)}`, "ok");
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
+        const A = UIController.readMatrixGrid("eqA_grid");
+        const b = UIController.readMatrixGrid("eqb_grid").map((row) => row[0]);
 
-    $("#btnDet").onclick = () => {
-      try {
-        const A = AEditor.readGrid();
-        if (!matrixUtils.isSquare(A)) throw new Error("det() requires square matrix.");
-        const d = math.det(math.matrix(A));
-        out.setOutput(`det(A) = ${format.value(d)}`, "ok");
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
-
-    $("#btnInv").onclick = () => {
-      try {
-        const A = AEditor.readGrid();
-        if (!matrixUtils.isSquare(A)) throw new Error("inv() requires square matrix.");
-        const d = math.det(math.matrix(A));
-        if (math.equal(d, 0)) throw new Error("❌ Singular matrix (det = 0): no inverse exists.");
-        const invA = math.inv(math.matrix(A)).toArray();
-        out.setOutput(`A⁻¹:\n${format.matrix(invA)}`, "ok");
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
-
-    $("#btnRREF_A").onclick = () => {
-      try {
-        const A = AEditor.readGrid();
-        const { RREF, steps } = MatrixAlgebra.rrefWithSteps(A);
-        out.setOutput("RREF(A)", "ok");
-        out.append(steps.join("\n\n"));
-        out.append("\n---\nFinal RREF:\n" + format.matrix(RREF));
-        out.flush();
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
-
-    $("#btnRankA").onclick = () => {
-      try {
-        const A = AEditor.readGrid();
-        const r = MatrixAlgebra.rankOf(A);
-        out.setOutput(`rank(A) = ${r}`, "ok");
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
-
-    $("#btnAxB").onclick = () => {
-      try {
-        const A = AEditor.readGrid();
-        const B = BEditor.readGrid();
-        const prod = math.multiply(math.matrix(A), math.matrix(B)).toArray();
-        out.setOutput(`A × B:\n${format.matrix(prod)}`, "ok");
-      } catch (e) {
-        out.setOutput(`Multiplication failed: ${e.message}`, "bad");
-      }
-    };
-
-    $("#btnBxA").onclick = () => {
-      try {
-        const A = AEditor.readGrid();
-        const B = BEditor.readGrid();
-        const prod = math.multiply(math.matrix(B), math.matrix(A)).toArray();
-        out.setOutput(`B × A:\n${format.matrix(prod)}`, "ok");
-      } catch (e) {
-        out.setOutput(`Multiplication failed: ${e.message}`, "bad");
-      }
-    };
-
-    $("#btnATimesScalar").onclick = () => {
-      try {
-        const A = AEditor.readGrid();
-        const kStr = $("#scalarK").value.trim();
-        if (!kStr) throw new Error("Enter scalar k first.");
-        const k = matrixUtils.parseExpr(kStr);
-        const outA = A.map((r) => r.map((v) => math.multiply(k, v)));
-        out.setOutput(`${format.value(k)} · A:\n${format.matrix(outA)}`, "ok");
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
-
-    $("#btnTrace").onclick = () => {
-      try {
-        const A = AEditor.readGrid();
-        if (!matrixUtils.isSquare(A)) throw new Error("trace() requires square matrix.");
-        let tr = 0;
-        for (let i = 0; i < A.length; i++) {
-          tr = math.add(tr, A[i][i]);
-        }
-        out.setOutput(`trace(A) = ${format.value(tr)}`, "ok");
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
-  }
-
-  function buildVectors(root) {
-    root.innerHTML = `
-      <div class="grid2">
-        <div>
-          <div id="vsMat"></div>
-          <div class="divider"></div>
-          <div class="sectionTitle">Vector Interpretation</div>
-          <div class="hint">
-            Put vectors as columns. Then check span, independence, null space, and row space.
-          </div>
-        </div>
-        <div>
-          <div class="sectionTitle">Actions</div>
-          <div class="row">
-            <button class="primary" id="btnSpanRank">Rank/Dimension</button>
-            <button class="primary" id="btnIndepCols">Column Independence</button>
-            <button class="primary" id="btnNull">Null Space Basis</button>
-            <button class="primary" id="btnRowSpace">Row Space Basis</button>
-            <button id="btnRREF_VS">RREF</button>
-          </div>
-          <div class="divider"></div>
-          <div class="sectionTitle">Coordinates</div>
-          <div class="row">
-            <button class="primary" id="btnCoords">Find coordinates</button>
-            <button id="btnSpanContains">Check v in span?</button>
-          </div>
-          <div class="row">
-            <label>Target v</label>
-            <input type="text" id="vecV" placeholder="e.g. 1,2,3" style="width:100%">
-          </div>
-        </div>
-      </div>
-    `;
-
-    VS_Editor = createMatrixEditor(root.querySelector("#vsMat"), "vs", 3, 3, "Matrix A");
-
-    $("#btnSpanRank").onclick = () => {
-      try {
-        const A = VS_Editor.readGrid();
-        const r = MatrixAlgebra.rankOf(A);
-        out.setOutput(`rank(A) = ${r}\nDim(Col(A)) = ${r}\nDim(Row(A)) = ${r}`, "ok");
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
-
-    $("#btnIndepCols").onclick = () => {
-      try {
-        const A = VS_Editor.readGrid();
-        const r = MatrixAlgebra.rankOf(A);
-        const ncols = A[0].length;
-        const indep = r === ncols;
-        out.setOutput(
-          `Columns: rank = ${r}, count = ${ncols}\n${indep ? "✅ LINEARLY INDEPENDENT" : "❌ LINEARLY DEPENDENT"}`,
-          indep ? "ok" : "warn"
+        const result = MathEngine.gaussianElimination(A, b);
+        UIController.clearOutput();
+        UIController.showResult(
+          "Solution via Gaussian Elimination",
+          LatexFormatter.vector(result.solution),
+          `<p><strong>System:</strong> ${A.length} equations, ${A[0].length} variables</p>`
         );
       } catch (e) {
-        out.setOutput(e.message, "bad");
+        UIController.showError(e.message);
       }
     };
 
-    $("#btnNull").onclick = () => {
+    window.solveViaCramer = () => {
       try {
-        const A = VS_Editor.readGrid();
-        const ns = MatrixAlgebra.nullSpaceBasis(A);
-        out.setOutput(`Null Space N(A): ${ns.note}`, "ok");
-        if (ns.basis.length === 0) {
-          out.append("Basis: (empty) → only {0}");
-        } else {
-          out.append("Basis vectors:");
-          ns.basis.forEach((v, i) => {
-            out.append(`v${i + 1} = [${v.map(format.value).join(", ")}]ᵀ`);
-          });
-        }
-        out.flush();
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
+        const A = UIController.readMatrixGrid("eqA_grid");
+        const b = UIController.readMatrixGrid("eqb_grid").map((row) => row[0]);
+        const { rows, cols } = MathEngine.dims(A);
 
-    $("#btnRowSpace").onclick = () => {
-      try {
-        const A = VS_Editor.readGrid();
-        const basis = MatrixAlgebra.rowSpaceBasis(A);
-        out.setOutput(`Row Space (RREF nonzero rows)`, "ok");
-        basis.forEach((r, i) => {
-          out.append(`r${i + 1}: [${r.map(format.value).join(", ")}]`);
-        });
-        out.append(`\nDim(Row(A)) = ${basis.length}`);
-        out.flush();
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
-
-    $("#btnRREF_VS").onclick = () => {
-      try {
-        const A = VS_Editor.readGrid();
-        const { RREF, steps } = MatrixAlgebra.rrefWithSteps(A);
-        out.setOutput("RREF(A)", "ok");
-        out.append(steps.join("\n\n"));
-        out.append("\n---\nFinal:\n" + format.matrix(RREF));
-        out.flush();
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
-
-    const parseVector = (text) => {
-      const parts = text.trim().split(/[\s,;]+/).filter(Boolean);
-      if (parts.length === 0) throw new Error("Enter target vector v.");
-      return parts.map((p) => matrixUtils.parseExpr(p));
-    };
-
-    $("#btnCoords").onclick = () => {
-      try {
-        const A = VS_Editor.readGrid();
-        const v = parseVector($("#vecV").value);
-        if (A.length !== v.length) throw new Error("Vector length must match matrix rows.");
-        const sol = math.lusolve(math.matrix(A), math.matrix(v));
-        out.setOutput(`Coordinates c (solving A·c = v):\nc = [${sol.toArray().map(format.value).join(", ")}]ᵀ`, "ok");
-      } catch (e) {
-        out.setOutput(`Could not find unique coordinates: ${e.message}`, "warn");
-      }
-    };
-
-    $("#btnSpanContains").onclick = () => {
-      try {
-        const A = VS_Editor.readGrid();
-        const v = parseVector($("#vecV").value);
-        if (A.length !== v.length) throw new Error("Vector length mismatch.");
-        const Aug = A.map((row, i) => row.concat([v[i]]));
-        const { RREF } = MatrixAlgebra.rrefWithSteps(Aug);
-
-        let inconsistent = false;
-        for (const row of RREF) {
-          const left = row.slice(0, A[0].length);
-          if (left.every((x) => math.equal(x, 0)) && !math.equal(row[A[0].length], 0)) {
-            inconsistent = true;
-          }
+        if (rows !== cols) {
+          throw new Error("Cramer's rule requires square matrix");
         }
 
-        out.setOutput(inconsistent ? "❌ v is NOT in span" : "✅ v IS in span", inconsistent ? "warn" : "ok");
-        out.append("\nRREF([A|v]):\n" + format.matrix(RREF));
-        out.flush();
+        const detA = MathEngine.determinant(A);
+        if (Math.abs(detA) < 1e-10) {
+          throw new Error("Determinant is zero: Cramer's rule not applicable");
+        }
+
+        UIController.clearOutput();
+        UIController.showResult("Determinant of A", LatexFormatter.scalar(detA));
+
+        const solutions = [];
+        for (let i = 0; i < cols; i++) {
+          const Ai = A.map((row, ri) => row.map((val, cj) => (cj === i ? b[ri] : val)));
+          const detAi = MathEngine.determinant(Ai);
+          solutions.push(detAi / detA);
+        }
+
+        UIController.showResult("Solution via Cramer's Rule", LatexFormatter.vector(solutions));
       } catch (e) {
-        out.setOutput(e.message, "bad");
+        UIController.showError(e.message);
       }
     };
   }
 
-  function buildEigen(root) {
+  /**
+   * Matrix Operations
+   */
+  function buildMatrixOps(root) {
+    UIController.clearOutput();
+
     root.innerHTML = `
-      <div class="grid2">
-        <div>
-          <div id="eMat"></div>
-          <div class="divider"></div>
-          <div class="hint">
-            Eigenvalues/vectors satisfy <b>A v = λ v</b>. This tool uses <span class="mono">math.eigs</span> or 2×2 fallback.
-          </div>
-        </div>
-        <div>
-          <div class="sectionTitle">Compute</div>
-          <div class="row">
-            <button class="primary" id="btnEigen">Eigenvalues & Vectors</button>
-            <button id="btnCharPoly2x2">Char Poly (2×2)</button>
-          </div>
-          <div class="divider"></div>
-          <div class="hint mini">For 2×2: p(λ) = λ² − (trace)λ + det</div>
-        </div>
-      </div>
-    `;
-
-    E_Editor = createMatrixEditor(root.querySelector("#eMat"), "eig", 2, 2, "Matrix A");
-
-    $("#btnEigen").onclick = () => {
-      try {
-        const A = E_Editor.readGrid();
-        const res = MatrixAlgebra.eigenSolve(A);
-        out.setOutput(`Eigenvalues (${res.mode})`, "ok");
-        out.append("Values:");
-        res.values.forEach((v, i) => {
-          out.append(`λ${i + 1} = ${format.value(v)}`);
-        });
-        out.append("\nVectors:");
-        if (res.mode === "mathjs") {
-          const V = res.vectors.toArray();
-          out.append("V (columns are eigenvectors):\n" + format.matrix(V));
-        } else {
-          res.vectors.forEach((v, i) => {
-            out.append(`v${i + 1} = [${v.map(format.value).join(", ")}]ᵀ`);
-          });
-        }
-        out.flush();
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
-
-    $("#btnCharPoly2x2").onclick = () => {
-      try {
-        const A = E_Editor.readGrid();
-        if (A.length !== 2 || A[0].length !== 2) throw new Error("Characteristic polynomial: 2×2 only.");
-        const tr = math.add(A[0][0], A[1][1]);
-        const det = math.subtract(math.multiply(A[0][0], A[1][1]), math.multiply(A[0][1], A[1][0]));
-        out.setOutput(`Characteristic Polynomial (2×2)`, "ok");
-        out.append(`trace(A) = ${format.value(tr)}`);
-        out.append(`det(A) = ${format.value(det)}`);
-        out.append(`p(λ) = λ² − (${format.value(tr)})·λ + (${format.value(det)})`);
-        out.flush();
-      } catch (e) {
-        out.setOutput(e.message, "bad");
-      }
-    };
-  }
-
-  function buildTransform(root) {
-    root.innerHTML = `
-      <div class="grid2">
-        <div>
-          <div class="sectionTitle">2D Transformation</div>
-          <div class="hint mini">Enter 2×2 matrix, plot point clouds before/after A·v.</div>
-          <div id="t2"></div>
-          <div class="row" style="margin-top:12px;">
-            <button class="primary" id="btnPlot2D">Plot 2D</button>
-            <button id="btnApply2D">Apply to v</button>
-            <input type="text" id="vec2" placeholder="(x,y) e.g. 1,2" style="width:180px">
-          </div>
-        </div>
-        <div>
-          <div class="sectionTitle">4D Transformation</div>
-          <div class="hint mini">4D projections (XY and ZW planes with w=0).</div>
-          <div id="t4"></div>
-          <div class="row" style="margin-top:12px;">
-            <button class="primary" id="btnPlot4D">Plot 4D</button>
-            <button id="btnApply4D">Apply to v</button>
-            <input type="text" id="vec4" placeholder="(x,y,z,w) e.g. 1,0,2,0" style="width:220px">
+      <div class="operations-panel">
+        <div class="operation-section">
+          <h3>Matrix Operations</h3>
+          <div id="mop-a-editor"></div>
+          <div id="mop-b-editor"></div>
+          <div class="button-group">
+            <button class="btn-primary" onclick="window.opTranspose()">A<sup>T</sup> (Transpose)</button>
+            <button class="btn-primary" onclick="window.opAdd()">A + B</button>
+            <button class="btn-primary" onclick="window.opSubtract()">A - B</button>
+            <button class="btn-primary" onclick="window.opMultiply()">A × B</button>
+            <button class="btn-secondary" onclick="window.opDeterminant()">det(A)</button>
+            <button class="btn-secondary" onclick="window.opTrace()">trace(A)</button>
+            <button class="btn-secondary" onclick="window.opInverse()">A<sup>-1</sup></button>
+            <button class="btn-secondary" onclick="window.opRank()">rank(A)</button>
           </div>
         </div>
       </div>
     `;
 
-    T2_Editor = createMatrixEditor(root.querySelector("#t2"), "t2ed", 2, 2, "A (2×2)");
-    T4_Editor = createMatrixEditor(root.querySelector("#t4"), "t4ed", 4, 4, "A (4×4)");
+    const aEditor = UIController.createMatrixEditor(root.querySelector("#mop-a-editor"), "mopA", 3, 3, "Matrix A");
+    const bEditor = UIController.createMatrixEditor(root.querySelector("#mop-b-editor"), "mopB", 3, 3, "Matrix B");
 
-    const parseVec = (text) => {
-      const parts = text.trim().split(/[\s,;]+/).filter(Boolean);
-      return parts.map((p) => matrixUtils.parseExpr(p));
-    };
-
-    $("#btnPlot2D").onclick = () => {
+    window.opTranspose = () => {
       try {
-        const A = T2_Editor.readGrid();
-        if (A.length !== 2 || A[0].length !== 2) throw new Error("Need 2×2.");
-        out.setOutput("Plotted 2D transformation", "ok");
-        plot2DTransform(A);
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const AT = MathEngine.transpose(A);
+        UIController.clearOutput();
+        UIController.showResult("A<sup>T</sup> (Transpose)", LatexFormatter.matrix(AT));
       } catch (e) {
-        out.setOutput(e.message, "bad");
+        UIController.showError(e.message);
       }
     };
 
-    $("#btnApply2D").onclick = () => {
+    window.opAdd = () => {
       try {
-        const A = T2_Editor.readGrid();
-        if (A.length !== 2 || A[0].length !== 2) throw new Error("Need 2×2.");
-        const v = parseVec($("#vec2").value);
-        if (v.length !== 2) throw new Error("Enter 2 values (x,y).");
-        const res = math.multiply(math.matrix(A), math.matrix(v)).toArray();
-        out.setOutput(`A·v = [${res.map(format.value).join(", ")}]ᵀ`, "ok");
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const B = UIController.readMatrixGrid("mopB_grid");
+        const C = MathEngine.add(A, B);
+        UIController.clearOutput();
+        UIController.showResult("A + B", LatexFormatter.matrix(C));
       } catch (e) {
-        out.setOutput(e.message, "bad");
+        UIController.showError(e.message);
       }
     };
 
-    $("#btnPlot4D").onclick = () => {
+    window.opSubtract = () => {
       try {
-        const A = T4_Editor.readGrid();
-        if (A.length !== 4 || A[0].length !== 4) throw new Error("Need 4×4.");
-        out.setOutput("Plotted 4D projections (XY and ZW)", "ok");
-        plot4DTransformProjections(A);
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const B = UIController.readMatrixGrid("mopB_grid");
+        const C = MathEngine.subtract(A, B);
+        UIController.clearOutput();
+        UIController.showResult("A - B", LatexFormatter.matrix(C));
       } catch (e) {
-        out.setOutput(e.message, "bad");
+        UIController.showError(e.message);
       }
     };
 
-    $("#btnApply4D").onclick = () => {
+    window.opMultiply = () => {
       try {
-        const A = T4_Editor.readGrid();
-        if (A.length !== 4 || A[0].length !== 4) throw new Error("Need 4×4.");
-        const v = parseVec($("#vec4").value);
-        if (v.length !== 4) throw new Error("Enter 4 values (x,y,z,w).");
-        const res = math.multiply(math.matrix(A), math.matrix(v)).toArray();
-        out.setOutput(`A·v = [${res.map(format.value).join(", ")}]ᵀ`, "ok");
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const B = UIController.readMatrixGrid("mopB_grid");
+        const C = MathEngine.multiply(A, B);
+        UIController.clearOutput();
+        UIController.showResult("A × B", LatexFormatter.matrix(C));
       } catch (e) {
-        out.setOutput(e.message, "bad");
+        UIController.showError(e.message);
+      }
+    };
+
+    window.opDeterminant = () => {
+      try {
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const det = MathEngine.determinant(A);
+        UIController.clearOutput();
+        UIController.showResult("det(A)", LatexFormatter.scalar(det));
+      } catch (e) {
+        UIController.showError(e.message);
+      }
+    };
+
+    window.opTrace = () => {
+      try {
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const tr = MathEngine.trace(A);
+        UIController.clearOutput();
+        UIController.showResult("trace(A)", LatexFormatter.scalar(tr));
+      } catch (e) {
+        UIController.showError(e.message);
+      }
+    };
+
+    window.opInverse = () => {
+      try {
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const Ainv = MathEngine.inverse(A);
+        UIController.clearOutput();
+        UIController.showResult("A<sup>-1</sup> (Inverse)", LatexFormatter.matrix(Ainv));
+      } catch (e) {
+        UIController.showError(e.message);
+      }
+    };
+
+    window.opRank = () => {
+      try {
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const r = MathEngine.rank(A);
+        UIController.clearOutput();
+        UIController.showResult("rank(A)", LatexFormatter.scalar(r));
+      } catch (e) {
+        UIController.showError(e.message);
       }
     };
   }
 
-  /* =========================================================
-     Quick Examples
-  ========================================================= */
-  $("#btnExample2x2").onclick = () => {
+  // =========================================================
+  //  INITIALIZE APP
+  // =========================================================
+
+  function initApp() {
+    const TABS = [
+      { id: "equations", label: "Equations", build: buildEquations },
+      { id: "matops", label: "Operations", build: buildMatrixOps },
+    ];
+
+    function setActiveTab(id) {
+      document.querySelectorAll(".tab-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.tab === id);
+      });
+
+      const panelBody = document.querySelector("#panelBody");
+      panelBody.innerHTML = "";
+
+      const tab = TABS.find((t) => t.id === id);
+      if (tab) {
+        tab.build(panelBody);
+      }
+    }
+
+    // Initialize tabs
+    const tabsContainer = document.querySelector("#tabs");
+    if (tabsContainer) {
+      tabsContainer.innerHTML = TABS.map(
+        (t) => `<button class="tab-btn ${t.id === "equations" ? "active" : ""}" data-tab="${t.id}">${t.label}</button>`
+      ).join("");
+
+      document.querySelectorAll(".tab-btn").forEach((btn) => {
+        btn.onclick = () => setActiveTab(btn.dataset.tab);
+      });
+    }
+
     setActiveTab("equations");
-    eqAEditor.writeGrid([
-      ["2", "1", "-1"],
-      ["-3", "-1", "2"],
-      ["-2", "1", "2"],
-    ]);
-    eqbEditor.writeGrid([["8"], ["-11"], ["-3"]]);
-    out.setOutput("Loaded 3×3 system example", "ok");
-  };
+  }
 
-  $("#btnExample3x3").onclick = () => {
-    setActiveTab("matops");
-    AEditor.writeGrid([
-      ["1", "2", "3"],
-      ["0", "1", "4"],
-      ["5", "6", "0"],
-    ]);
-    BEditor.writeGrid([
-      ["-2", "1", "0"],
-      ["3", "0", "1"],
-      ["4", "1", "2"],
-    ]);
-    out.setOutput("Loaded matrix operations examples", "ok");
-  };
-
-  $("#btnExampleEigen").onclick = () => {
-    setActiveTab("eigen");
-    E_Editor.writeGrid([
-      ["4", "2"],
-      ["1", "3"],
-    ]);
-    out.setOutput("Loaded 2×2 eigenvalue example", "ok");
-  };
-
-  $("#btnExampleT4").onclick = () => {
-    setActiveTab("transform");
-    T4_Editor.writeGrid([
-      ["0", "-1", "0", "0"],
-      ["1", "0", "0", "0"],
-      ["0", "0", "2", "0"],
-      ["0", "0", "0", "0.5"],
-    ]);
-    T2_Editor.writeGrid([
-      ["1", "1"],
-      ["0", "1"],
-    ]);
-    out.setOutput("Loaded transformation examples", "ok");
-  };
-
-  $("#btnClearAll").onclick = () => {
-    $("#plot").style.display = "none";
-    out.setOutput("Output cleared. Matrices preserved.", "ok");
-  };
+  initApp();
 });

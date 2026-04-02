@@ -1,91 +1,44 @@
 /* =========================================================
-   Linear Algebra Simulator - Synchronized with Control Systems
-   Uses global design system from global.css
+   Linear Algebra Simulator - Professional Engineering Tool
+   Modern, clean design optimized for mathematical operations
 ========================================================= */
 
 /* =========================================================
-   Typography
-========================================================= */
-h1, h2, h3, h4, h5, h6 {
-  margin: 0;
-  font-weight: 700;
-}
-
-h2 {
-  margin: 0;
-  font-size: 44px;
-  letter-spacing: -1px;
-  line-height: 1.05;
-}
-
-.sub {
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-weight: 650;
-  line-height: 1.8;
-  max-width: 72ch;
-}
-
-.sectionTitle {
-  font-weight: 1000;
-  font-size: 13px;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  margin: 0 0 8px 0;
-  color: rgba(9, 16, 42, 0.88);
-  border-bottom: 2px solid rgba(9, 16, 42, 0.14);
-  padding-bottom: 8px;
-}
-
-.hint {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.mono {
-  font-family: var(--mono);
-  font-size: 12px;
-}
-
-/* =========================================================
-   Layout & Container
+   Layout Structure
 ========================================================= */
 main {
   padding: 44px 0 70px;
 }
 
-.headRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-
-.headRow h2 {
-  margin: 0 0 6px 0;
-}
-
-.main {
-  max-width: 1200px;
+.app-grid {
+  max-width: 1400px;
   margin: 0 auto;
   padding: 18px;
   display: grid;
-  gap: 16px;
-  grid-template-columns: 330px 1fr;
+  grid-template-columns: 300px 1fr;
+  gap: 20px;
 }
 
-@media (max-width: 980px) {
-  .main {
+@media (max-width: 1024px) {
+  .app-grid {
     grid-template-columns: 1fr;
   }
 }
 
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.content-area {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* =========================================================
-   Card & Container
+   Card Styling - Universal
 ========================================================= */
 .card {
   border: 1px solid rgba(9, 16, 42, 0.12);
@@ -110,17 +63,9 @@ main {
   margin: 0;
   padding: 14px;
   border-bottom: 1px solid rgba(9, 16, 42, 0.12);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   font-size: 14px;
   font-weight: 900;
-}
-
-.card h2 small {
-  color: var(--muted);
-  font-weight: 800;
-  font-size: 12px;
+  color: rgba(9, 16, 42, 0.95);
 }
 
 .pad {
@@ -128,14 +73,36 @@ main {
   flex: 1;
 }
 
-.divider {
-  height: 1px;
-  background: var(--border);
-  margin: 12px 0;
+/* =========================================================
+   Header Styling
+========================================================= */
+.headRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.headRow h2 {
+  margin: 0;
+  font-size: 44px;
+  letter-spacing: -1px;
+  line-height: 1.05;
+  color: var(--text);
+}
+
+.sub {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-weight: 650;
+  line-height: 1.8;
+  max-width: 72ch;
 }
 
 /* =========================================================
-   Tabs
+   Tabs and Tab Navigation
 ========================================================= */
 .tabs {
   display: flex;
@@ -146,7 +113,7 @@ main {
   background: linear-gradient(180deg, rgba(242, 246, 255, 0.7), rgba(255, 255, 255, 0.7));
 }
 
-.tabBtn {
+.tab-btn {
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.7);
   color: var(--text);
@@ -160,11 +127,12 @@ main {
   white-space: nowrap;
 }
 
-.tabBtn:hover {
+.tab-btn:hover {
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(63, 111, 255, 0.1);
 }
 
-.tabBtn.active {
+.tab-btn.active {
   background: linear-gradient(135deg, rgba(8, 181, 141, 0.18), rgba(63, 111, 255, 0.18));
   color: var(--text);
   border-color: rgba(63, 111, 255, 0.3);
@@ -173,79 +141,134 @@ main {
 }
 
 /* =========================================================
-   Layout Grids
+   Matrix Editor Components
 ========================================================= */
-.grid2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.matrix-editor {
+  margin-bottom: 16px;
+}
+
+.matrix-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 12px;
+  margin-bottom: 12px;
 }
 
-@media (max-width: 980px) {
-  .grid2 {
-    grid-template-columns: 1fr;
-  }
+.matrix-header h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 1000;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: rgba(9, 16, 42, 0.88);
+  border-bottom: 2px solid rgba(9, 16, 42, 0.14);
+  padding-bottom: 8px;
+  flex: 1;
 }
 
-.row {
+.matrix-controls {
   display: flex;
   gap: 10px;
   align-items: center;
-  flex-wrap: wrap;
 }
 
-/* =========================================================
-   Forms & Inputs
-========================================================= */
-label {
+.matrix-controls label {
   display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 13px;
-  color: rgba(9, 16, 42, 0.92);
-  font-weight: 800;
-  user-select: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
-input[type="number"],
-input[type="text"],
-select,
-textarea {
-  width: 100%;
-  border: 1px solid rgba(9, 16, 42, 0.16);
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--text);
-  border-radius: 16px;
-  padding: 10px 12px;
-  font-size: 13px;
-  font-family: inherit;
-  outline: none;
-  transition: box-shadow 0.12s ease;
-  font-weight: 900;
+.matrix-controls input[type="number"] {
+  width: 50px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
 }
 
-input[type="number"]:focus,
-input[type="text"]:focus,
-select:focus,
-textarea:focus {
-  outline: none;
-  box-shadow: 0 0 0 6px rgba(63, 111, 255, 0.12);
-}
-
-input[type="range"] {
-  width: 100%;
+.resize-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
   cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  transition: 0.15s all;
 }
 
-textarea {
-  min-height: 96px;
-  resize: vertical;
+.resize-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(63, 111, 255, 0.1);
+}
+
+.matrix-grid {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px dashed rgba(9, 16, 42, 0.18);
+  border-radius: 14px;
+  background: rgba(63, 111, 255, 0.03);
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+/* Matrix Grid Cell */
+.cell {
+  width: 100%;
+  min-width: 60px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
   font-family: var(--mono);
   font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.cell:focus {
+  border-color: rgba(63, 111, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(63, 111, 255, 0.15);
 }
 
 /* =========================================================
-   Buttons
+   Operations Panel
+========================================================= */
+.operations-panel {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.operation-section {
+  margin-bottom: 20px;
+}
+
+.operation-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--text);
+  border-bottom: 2px solid rgba(63, 111, 255, 0.2);
+  padding-bottom: 8px;
+}
+
+.button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* =========================================================
+   Button Styles
 ========================================================= */
 button {
   border: 1px solid var(--border);
@@ -259,6 +282,7 @@ button {
   transition: transform 0.12s ease, box-shadow 0.2s ease;
   user-select: none;
   font-family: inherit;
+  white-space: nowrap;
 }
 
 button:hover {
@@ -270,116 +294,147 @@ button:active {
   transform: translateY(0);
 }
 
-button.primary {
+.btn-primary {
   border-color: rgba(63, 111, 255, 0.3);
   background: linear-gradient(135deg, rgba(8, 181, 141, 0.95), rgba(63, 111, 255, 0.9));
   color: #06101a;
   font-weight: 1000;
+  flex: 1;
+  min-width: 140px;
 }
 
-button.primary:hover {
+.btn-primary:hover {
   border-color: rgba(63, 111, 255, 0.5);
   box-shadow: 0 22px 60px rgba(16, 24, 40, 0.12);
 }
 
-button.danger {
-  border-color: rgba(211, 47, 47, 0.35);
-  background: linear-gradient(180deg, rgba(211, 47, 47, 0.12), rgba(211, 47, 47, 0.06));
-  color: #7a0b1a;
+.btn-secondary {
+  border-color: rgba(63, 111, 255, 0.2);
+  background: rgba(63, 111, 255, 0.08);
+  color: #0b2a7a;
   font-weight: 900;
+  flex: 1;
+  min-width: 100px;
 }
 
-button.danger:hover {
-  border-color: rgba(211, 47, 47, 0.55);
-  box-shadow: 0 10px 18px rgba(211, 47, 47, 0.1);
+.btn-secondary:hover {
+  background: rgba(63, 111, 255, 0.12);
+  border-color: rgba(63, 111, 255, 0.3);
 }
 
-/* =========================================================
-   Matrix Grid & Cells
-========================================================= */
-.matrixWrap {
-  overflow: auto;
-  padding: 2px;
-  border-radius: 14px;
-  border: 1px dashed rgba(9, 16, 42, 0.18);
-  background: rgba(63, 111, 255, 0.03);
+.btn-small {
+  padding: 8px 12px;
+  font-size: 12px;
+  flex: 1;
 }
 
-.matrixGrid {
-  display: grid;
-  gap: 6px;
-  align-items: stretch;
-  padding: 8px;
-}
-
-.cell {
-  width: 74px !important;
-  padding: 9px 8px !important;
-  border-radius: 8px !important;
-  border: 1px solid var(--border) !important;
-  background: #fff !important;
-  font-family: var(--mono) !important;
-  font-size: 12px !important;
-  text-align: center;
-  font-weight: 700 !important;
-}
-
-.cell:focus {
-  border-color: rgba(63, 111, 255, 0.6) !important;
-  box-shadow: 0 0 0 2px rgba(63, 111, 255, 0.1) !important;
+.quick-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* =========================================================
-   Output Panel
+   Output Panel & Results
 ========================================================= */
-.out {
-  white-space: pre-wrap;
-  word-break: break-word;
+.output-card {
+  min-height: 300px;
+  max-height: 600px;
+}
+
+.output-panel {
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: 13px;
   background: #0b1220;
   color: #e6eefc;
-  border-radius: 14px;
-  padding: 12px;
+  border-radius: 12px;
+  padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  overflow: auto;
-  max-height: 420px;
+  overflow-y: auto;
+  height: 100%;
+  line-height: 1.6;
+}
+
+.result-block {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.result-block:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.result-title {
+  font-weight: 900;
+  color: #08b58d;
+  margin-bottom: 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.result-latex {
+  background: rgba(8, 181, 141, 0.1);
+  border-left: 3px solid #08b58d;
+  padding: 12px;
+  border-radius: 8px;
+  margin: 8px 0;
+  font-size: 14px;
+  color: #e6eefc;
+  overflow-x: auto;
+}
+
+.result-extra {
+  color: rgba(230, 238, 252, 0.7);
+  font-size: 12px;
+  margin-top: 8px;
   line-height: 1.5;
 }
 
-/* =========================================================
-   Plot Container
-========================================================= */
-.plot {
-  height: 420px;
-  width: 100%;
-  border-top: 1px solid var(--border);
-  border-radius: 14px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.85);
+.error-message {
+  background: rgba(211, 47, 47, 0.15);
+  border-left: 3px solid #d32f2f;
+  padding: 12px;
+  border-radius: 8px;
+  color: #ff6b6b;
+  font-weight: 700;
+  margin-bottom: 12px;
 }
 
 /* =========================================================
-   Pills & Content
+   Typography
 ========================================================= */
-.pill {
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid var(--border);
-  box-shadow: 0 6px 18px rgba(2, 8, 23, 0.05);
-  display: flex;
-  gap: 8px;
-  align-items: center;
+.sectionTitle {
+  font-weight: 1000;
+  font-size: 13px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin: 8px 0;
+  color: rgba(9, 16, 42, 0.88);
+  border-bottom: 2px solid rgba(9, 16, 42, 0.14);
+  padding-bottom: 8px;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 12px 0;
+}
+
+.hint {
   font-size: 12px;
   font-weight: 700;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
-.kpi {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 10px;
+.mono {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 /* =========================================================
@@ -401,11 +456,33 @@ button.danger:hover {
 }
 
 /* =========================================================
-   Responsive
+   KaTeX Math Rendering
 ========================================================= */
-@media (max-width: 980px) {
-  .main {
+.katex {
+  margin: 0;
+  padding: 0;
+  color: #e6eefc;
+}
+
+.katex-display {
+  margin: 0;
+  padding: 0;
+}
+
+/* =========================================================
+   Responsive Design
+========================================================= */
+@media (max-width: 1024px) {
+  .app-grid {
     grid-template-columns: 1fr;
+  }
+
+  .operation-card {
+    order: 1;
+  }
+
+  .output-card {
+    order: 2;
   }
 }
 
@@ -414,49 +491,45 @@ button.danger:hover {
     padding: 44px 0 60px;
   }
 
-  .main {
+  .app-grid {
     padding: 12px;
-    gap: 12px;
+    gap: 16px;
   }
 
   .card {
     border-radius: 16px;
   }
 
-  .tabs {
-    padding: 10px;
-    gap: 6px;
-  }
-
-  .tabBtn {
-    padding: 7px 10px;
-    font-size: 11px;
-  }
-
-  .row {
-    gap: 8px;
-  }
-
-  button {
-    padding: 8px 10px;
-    font-size: 12px;
-  }
-
-  .cell {
-    width: 60px !important;
-  }
-
-  .plot {
-    height: 300px;
-  }
-
-  .out {
-    max-height: 300px;
-    font-size: 12px;
-  }
-
-  h2 {
+  .headRow h2 {
     font-size: 32px;
+  }
+
+  .matrix-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .matrix-controls {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .matrix-grid {
+    max-height: 300px;
+  }
+
+  .output-panel {
+    font-size: 12px;
   }
 }
 
@@ -474,8 +547,13 @@ button.danger:hover {
     page-break-inside: avoid;
   }
 
-  .plot,
-  .out {
-    page-break-inside: avoid;
+  .output-panel {
+    background: white;
+    color: black;
+    border: 1px solid #ddd;
+  }
+
+  button {
+    display: none;
   }
 }
