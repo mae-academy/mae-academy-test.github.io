@@ -53,7 +53,7 @@ $mailSent = @mail($to, $email_subject, $email_body, $headers);
 if ($mailSent) {
     jsonResponse([
         "success" => true,
-        "message" => "Message sent successfully ✅"
+        "message" => "Message sent successfully "
     ], 200);
 }
 else {
