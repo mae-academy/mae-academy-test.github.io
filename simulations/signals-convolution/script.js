@@ -4,30 +4,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
     const lerp = (a, b, t) => a + (b - a) * t;
 
-    function niceStep(range) {
-      if (range <= 0) return 1;
-      const p = Math.pow(10, Math.floor(Math.log10(range)));
-      const n = range / p;
-      if (n < 1.5) return 0.2 * p;
-      if (n < 3) return 0.5 * p;
-      if (n < 7) return 1.0 * p;
-      return 2.0 * p;
-    }
-
-    function decimalsForStep(step) {
-      const a = Math.abs(step);
-      if (a >= 10) return 0;
-      if (a >= 1) return 1;
-      if (a >= 0.1) return 2;
-      if (a >= 0.01) return 3;
-      return 4;
-    }
-
-    function fmt(v, stepHint) {
-      const d = decimalsForStep(stepHint || 1);
-      return Number(v).toFixed(d);
-    }
-
     function linspace(a, b, n) {
       const xs = new Array(n);
       if (n === 1) { xs[0] = a; return xs; }
@@ -78,14 +54,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const range = Math.max(1e-9, tMax - tMin);
 
       if (mode === "discrete") {
-        // integer samples only; convolution sum window handled separately
         return { nT: 0, nTau: 0, approxDt: 1 };
       }
 
-      // continuous: choose smooth plots + stable integration
-      // target ~ 60 pts/unit with caps
-      const nT = clamp(Math.round(range * 60), 360, 900);   // plot density
-      const nTau = clamp(Math.round(nT * 3.2), 900, 3800);  // integration density
+      const nT = clamp(Math.round(range * 60), 360, 900);   
+      const nTau = clamp(Math.round(nT * 3.2), 900, 3800);  
       const approxDt = range / Math.max(120, nTau);
 
       return { nT, nTau, approxDt };
@@ -96,7 +69,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const tau = linspace(tauMin, tauMax, nTau);
       const dTau = (tauMax - tauMin) / (nTau - 1);
 
-      // precompute x(tau)
       const xTau = tau.map(xFun);
 
       const y = new Array(tVec.length).fill(0);
@@ -147,181 +119,198 @@ document.addEventListener("DOMContentLoaded", () => {
       return lerp(ys[lo], ys[hi], t);
     }
 
-    /* ========= Plotting ========= */
-    function plotAxesAndGrid(ctx, W, H, pad, xMin, xMax, yMin, yMax) {
-      const w = W - pad.l - pad.r;
-      const h = H - pad.t - pad.b;
+    /* ========= Chart.js Plotting ========= */
+    let chartsState = {};
 
-      const X = (x) => pad.l + (x - xMin) / (xMax - xMin) * w;
-      const Y = (y) => pad.t + (1 - (y - yMin) / (yMax - yMin)) * h;
-
-      const gx = niceStep((xMax - xMin) / 6);
-      const gy = niceStep((yMax - yMin) / 5);
-
-      // clearer
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = "rgba(9,16,42,0.10)";
-
-      for (let x = Math.ceil(xMin / gx) * gx; x <= xMax + 1e-9; x += gx) {
-        const px = X(x);
-        ctx.beginPath(); ctx.moveTo(px, pad.t); ctx.lineTo(px, pad.t + h); ctx.stroke();
+    function createChart(canvasId, data, opts = {}) {
+      opts = opts || {};
+      
+      // Always destroy the old chart completely before creating a new one
+      if (chartsState[canvasId]) {
+        chartsState[canvasId].destroy();
+        chartsState[canvasId] = null;
       }
-      for (let y = Math.ceil(yMin / gy) * gy; y <= yMax + 1e-9; y += gy) {
-        const py = Y(y);
-        ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(pad.l + w, py); ctx.stroke();
-      }
+      
+      const customPluginOpts = {
+        vlineX: opts.vline,
+        pointMarker: opts.point
+      };
 
-      // axes
-      ctx.strokeStyle = "rgba(9,16,42,0.30)";
-      if (0 >= xMin && 0 <= xMax) {
-        const px = X(0);
-        ctx.beginPath(); ctx.moveTo(px, pad.t); ctx.lineTo(px, pad.t + h); ctx.stroke();
-      }
-      if (0 >= yMin && 0 <= yMax) {
-        const py = Y(0);
-        ctx.beginPath(); ctx.moveTo(pad.l, py); ctx.lineTo(pad.l + w, py); ctx.stroke();
-      }
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      const GRID = "rgba(9,16,42,0.10)";
+      const TICKS = "rgba(9,16,42,0.70)";
 
-      // labels bigger + darker
-      ctx.fillStyle = "rgba(9,16,42,0.80)";
-      ctx.font = "900 12px Inter, system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      for (let x = Math.ceil(xMin / gx) * gx; x <= xMax + 1e-9; x += gx) {
-        ctx.fillText(fmt(x, gx), X(x), pad.t + h + 8);
-      }
-      ctx.textAlign = "right";
-      ctx.textBaseline = "middle";
-      for (let y = Math.ceil(yMin / gy) * gy; y <= yMax + 1e-9; y += gy) {
-        ctx.fillText(fmt(y, gy), pad.l - 8, Y(y));
-      }
+      const chart = new Chart(ctx, {
+        type: 'line',
+        data: data,
+        options: {
+          customPluginOpts: customPluginOpts,
+          responsive: false,
+          maintainAspectRatio: false,
+          animation: false,
+          animations: { tension: { duration: 0 } },
+          interaction: { mode: 'index', intersect: false },
+          layout: {
+            padding: 0
+          },
+          plugins: {
+            legend: {
+              labels: {
+                color: TICKS,
+                font: { family: "Inter", weight: "900", size: 13 },
+                usePointStyle: true,
+                boxWidth: 12,
+                padding: 15
+              }
+            },
+            tooltip: {
+              backgroundColor: "rgba(255,255,255,0.96)",
+              titleColor: "rgba(9,16,42,0.95)",
+              bodyColor: "rgba(9,16,42,0.85)",
+              borderColor: "rgba(9,16,42,0.12)",
+              borderWidth: 1,
+              displayColors: false
+            },
+            filler: {
+              propagate: true
+            }
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              grid: { color: GRID, drawBorder: false },
+              ticks: { 
+                color: TICKS, 
+                maxTicksLimit: 8,
+                font: { weight: "900", size: 13 },
+                padding: 8
+              },
+              title: { 
+                display: true, 
+                text: 'Time', 
+                color: TICKS, 
+                font: { weight: "900", size: 15 },
+                padding: 12
+              }
+            },
+            y: {
+              type: 'linear',
+              grid: { color: GRID, drawBorder: false },
+              ticks: { 
+                color: TICKS, 
+                maxTicksLimit: 8,
+                font: { weight: "900", size: 13 },
+                padding: 8
+              },
+              title: { 
+                display: true, 
+                text: 'Amplitude', 
+                color: TICKS, 
+                font: { weight: "900", size: 15 },
+                padding: 12
+              }
+            }
+          }
+        },
+        plugins: [{
+          id: 'vlinePlugin',
+          afterDatasetsDraw(chart) {
+            const currentOpts = chart.config.options.customPluginOpts;
+            const vlineX = currentOpts.vlineX;
+            const pointMarker = currentOpts.pointMarker;
 
-      return { X, Y, gx, gy };
+            if (vlineX != null) {
+              const xScale = chart.scales.x;
+              const yScale = chart.scales.y;
+              const ctx = chart.ctx;
+              
+              const xPix = xScale.getPixelForValue(vlineX);
+              const topPix = yScale.getPixelForValue(yScale.max);
+              const bottomPix = yScale.getPixelForValue(yScale.min);
+              
+              ctx.save();
+              ctx.strokeStyle = "rgba(8,181,141,0.95)";
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(xPix, topPix);
+              ctx.lineTo(xPix, bottomPix);
+              ctx.stroke();
+              ctx.restore();
+            }
+            
+            if (pointMarker) {
+              const xScale = chart.scales.x;
+              const yScale = chart.scales.y;
+              const ctx = chart.ctx;
+              
+              const xPix = xScale.getPixelForValue(pointMarker.x);
+              const yPix = yScale.getPixelForValue(pointMarker.y);
+              
+              ctx.save();
+              ctx.strokeStyle = "rgba(255,255,255,0.95)";
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.arc(xPix, yPix, 6.2, 0, Math.PI * 2);
+              ctx.stroke();
+              
+              ctx.fillStyle = "rgba(8,181,141,0.95)";
+              ctx.beginPath();
+              ctx.arc(xPix, yPix, 4.2, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.restore();
+            }
+          }
+        }]
+      });
+
+      chartsState[canvasId] = chart;
+      return chart;
     }
 
-    function getBounds(xs, ys) {
-      const xMin = Math.min(...xs), xMax = Math.max(...xs);
-      let yMin = Math.min(...ys), yMax = Math.max(...ys);
-      if (!isFinite(yMin) || !isFinite(yMax)) { yMin = -1; yMax = 1; }
-      if (Math.abs(yMax - yMin) < 1e-12) { yMax = yMin + 1; }
-      const r = yMax - yMin;
-      yMin -= r * 0.08; yMax += r * 0.08;
-      return { xMin, xMax, yMin, yMax };
+    function plotContinuous(canvas, xs, ys, opts, label = 'y(t)') {
+      const canvasId = canvas.id;
+      opts = opts || {};
+
+      const points = xs.map((x, i) => ({ x: x, y: ys[i] }));
+      const data = {
+        datasets: [
+          {
+            label: label,
+            data: points,
+            borderColor: '#3f6fff',
+            backgroundColor: opts.shade ? 'rgba(8,181,141,0.16)' : 'rgba(63,111,255,0.15)',
+            borderWidth: 2.5,
+            pointRadius: 0,
+            fill: opts.shade ? true : false,
+            tension: 0.25
+          }
+        ]
+      };
+
+      createChart(canvasId, data, opts);
     }
 
-    function plotContinuous(canvas, xs, ys, opts) {
-      const ctx = canvas.getContext("2d");
-      const W = canvas.width, H = canvas.height;
-      const pad = { l: 52, r: 16, t: 18, b: 36 }; // bigger left for clearer numbers
+    function plotDiscrete(canvas, xs, ys, opts, label = 'y[n]') {
+      const canvasId = canvas.id;
+      opts = opts || {};
 
-      ctx.clearRect(0, 0, W, H);
+      const points = xs.map((x, i) => ({ x: x, y: ys[i] }));
+      const data = {
+        datasets: [
+          {
+            label: label,
+            data: points,
+            borderColor: 'rgba(63,111,255,0.80)',
+            backgroundColor: '#3f6fff',
+            borderWidth: 2,
+            pointRadius: 4.5,
+            pointStyle: 'circle',
+            showLine: false
+          }
+        ]
+      };
 
-      const b = getBounds(xs, ys);
-      const xMin = (opts && opts.xMin != null) ? opts.xMin : b.xMin;
-      const xMax = (opts && opts.xMax != null) ? opts.xMax : b.xMax;
-      const yMin = (opts && opts.yMin != null) ? opts.yMin : b.yMin;
-      const yMax = (opts && opts.yMax != null) ? opts.yMax : b.yMax;
-
-      const { X, Y } = plotAxesAndGrid(ctx, W, H, pad, xMin, xMax, yMin, yMax);
-
-      // shaded area
-      if (opts && opts.shade) {
-        const sx = opts.shade.xs, sy = opts.shade.ys;
-        ctx.fillStyle = "rgba(8,181,141,0.16)";
-        ctx.beginPath();
-        ctx.moveTo(X(sx[0]), Y(0));
-        for (let i = 0; i < sx.length; i++) ctx.lineTo(X(sx[i]), Y(sy[i]));
-        ctx.lineTo(X(sx[sx.length - 1]), Y(0));
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      // line
-      ctx.strokeStyle = "rgba(63,111,255,0.95)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (let i = 0; i < xs.length; i++) {
-        const px = X(xs[i]), py = Y(ys[i]);
-        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-
-      // vline + point
-      if (opts && opts.vline != null) {
-        const px = X(opts.vline);
-        ctx.strokeStyle = "rgba(8,181,141,0.95)";
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(px, pad.t); ctx.lineTo(px, H - pad.b); ctx.stroke();
-      }
-      if (opts && opts.point) {
-        const px = X(opts.point.x), py = Y(opts.point.y);
-        ctx.fillStyle = "rgba(8,181,141,0.95)";
-        ctx.beginPath(); ctx.arc(px, py, 4.2, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.95)";
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(px, py, 6.2, 0, Math.PI * 2); ctx.stroke();
-      }
-    }
-
-    // Discrete: stems + points (requested)
-    function plotDiscrete(canvas, xs, ys, opts) {
-      const ctx = canvas.getContext("2d");
-      const W = canvas.width, H = canvas.height;
-      const pad = { l: 52, r: 16, t: 18, b: 36 };
-
-      ctx.clearRect(0, 0, W, H);
-
-      const b = getBounds(xs, ys);
-      const xMin = (opts && opts.xMin != null) ? opts.xMin : b.xMin;
-      const xMax = (opts && opts.xMax != null) ? opts.xMax : b.xMax;
-      const yMin = (opts && opts.yMin != null) ? opts.yMin : b.yMin;
-      const yMax = (opts && opts.yMax != null) ? opts.yMin : b.yMin; // (typo safe)
-      // fix yMax/yMin if provided
-      const yyMin = (opts && opts.yMin != null) ? opts.yMin : b.yMin;
-      const yyMax = (opts && opts.yMax != null) ? opts.yMax : b.yMax;
-
-      const { X, Y } = plotAxesAndGrid(ctx, W, H, pad, xMin, xMax, yyMin, yyMax);
-
-      // stems + points
-      ctx.lineWidth = 2;
-      for (let i = 0; i < xs.length; i++) {
-        const x = xs[i], y = ys[i];
-        const px = X(x);
-        // stem
-        ctx.strokeStyle = "rgba(63,111,255,0.80)";
-        ctx.beginPath();
-        ctx.moveTo(px, Y(0));
-        ctx.lineTo(px, Y(y));
-        ctx.stroke();
-
-        // point
-        ctx.fillStyle = "rgba(63,111,255,0.95)";
-        ctx.beginPath();
-        ctx.arc(px, Y(y), 3.6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.95)";
-        ctx.lineWidth = 1.8;
-        ctx.beginPath();
-        ctx.arc(px, Y(y), 5.2, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.lineWidth = 2;
-      }
-
-      // marker line + marker point
-      if (opts && opts.vline != null) {
-        const px = X(opts.vline);
-        ctx.strokeStyle = "rgba(8,181,141,0.95)";
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(px, pad.t); ctx.lineTo(px, H - pad.b); ctx.stroke();
-      }
-      if (opts && opts.point) {
-        const px = X(opts.point.x), py = Y(opts.point.y);
-        ctx.fillStyle = "rgba(8,181,141,0.95)";
-        ctx.beginPath(); ctx.arc(px, py, 4.2, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.95)";
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(px, py, 6.2, 0, Math.PI * 2); ctx.stroke();
-      }
+      createChart(canvasId, data, opts);
     }
 
     /* ========= DOM ========= */
@@ -368,8 +357,8 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     function updateModeButtons() {
-      els.modeCont.classList.toggle("on", state.mode === "continuous");
-      els.modeDisc.classList.toggle("on", state.mode === "discrete");
+      if(els.modeCont) els.modeCont.classList.toggle("on", state.mode === "continuous");
+      if(els.modeDisc) els.modeDisc.classList.toggle("on", state.mode === "discrete");
     }
 
     function setMode(m) {
@@ -379,10 +368,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function setSliderFromT(t, tMin, tMax) {
+      if(!els.tSlider) return;
       const u = (t - tMin) / (tMax - tMin);
       els.tSlider.value = String(Math.round(clamp(u, 0, 1) * 1000));
     }
     function getTFromSlider(tMin, tMax) {
+      if(!els.tSlider) return 0;
       const u = parseInt(els.tSlider.value, 10) / 1000;
       return lerp(tMin, tMax, u);
     }
@@ -394,19 +385,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function readControls() {
       const mode = state.mode;
-      const tMin = parseFloat(els.tMin.value);
-      const tMax = parseFloat(els.tMax.value);
+      const tMin = els.tMin ? parseFloat(els.tMin.value) : -6;
+      const tMax = els.tMax ? parseFloat(els.tMax.value) : 6;
 
-      const xType = els.xType.value;
-      const hType = els.hType.value;
+      const xType = els.xType ? els.xType.value : "u";
+      const hType = els.hType ? els.hType.value : "rect";
 
-      const xA = parseFloat(els.xA.value);
-      const xShift = parseFloat(els.xShift.value);
-      const xScale = parseFloat(els.xScale.value);
+      const xA = els.xA ? parseFloat(els.xA.value) : 1;
+      const xShift = els.xShift ? parseFloat(els.xShift.value) : 0;
+      const xScale = els.xScale ? parseFloat(els.xScale.value) : 1;
 
-      const hA = parseFloat(els.hA.value);
-      const hShift = parseFloat(els.hShift.value);
-      const hScale = parseFloat(els.hScale.value);
+      const hA = els.hA ? parseFloat(els.hA.value) : 1;
+      const hShift = els.hShift ? parseFloat(els.hShift.value) : 0;
+      const hScale = els.hScale ? parseFloat(els.hScale.value) : 1;
 
       const { nT, nTau, approxDt } = autoResolution(mode, tMin, tMax);
 
@@ -417,25 +408,26 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function drawIntegrand(C, tMarker, yNow) {
+      if(!els.cint) return;
       if (C.mode === "continuous") {
         const tau = state.tauOrK;
         const integrand = tau.map(tt => C.xFun(tt) * C.hFun(tMarker - tt));
         plotContinuous(els.cint, tau, integrand, {
           shade: { xs: tau, ys: integrand }
-        });
-        els.intDesc.textContent = `t=${tMarker.toFixed(2)} · ∫ ≈ ${yNow.toFixed(3)}`;
+        }, 'x*h(t)');
+        if(els.intDesc) els.intDesc.textContent = `t=${tMarker.toFixed(2)} · ∫ ≈ ${yNow.toFixed(3)}`;
       } else {
         const ks = state.tauOrK;
         const integrand = ks.map(k => C.xFun(k) * C.hFun(tMarker - k));
-        plotDiscrete(els.cint, ks, integrand, {});
-        els.intDesc.textContent = `n=${tMarker} · Σ ≈ ${yNow.toFixed(3)}`;
+        plotDiscrete(els.cint, ks, integrand, {}, 'x*h[n]');
+        if(els.intDesc) els.intDesc.textContent = `n=${tMarker} · Σ ≈ ${yNow.toFixed(3)}`;
       }
     }
 
     function recompute(force = false) {
       const C = readControls();
       if (!(C.tMax > C.tMin + 1e-9)) {
-        els.tMax.value = String(C.tMin + 1);
+        if(els.tMax) els.tMax.value = String(C.tMin + 1);
         return recompute(true);
       }
 
@@ -452,9 +444,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // Descriptions
-      els.xDesc.textContent = describe(C.xType, C.xA, C.xShift, C.xScale, C.mode);
-      els.hDesc.textContent = describe(C.hType, C.hA, C.hShift, C.hScale, C.mode);
-      els.yDesc.textContent = (C.mode === "continuous")
+      if(els.xDesc) els.xDesc.textContent = describe(C.xType, C.xA, C.xShift, C.xScale, C.mode);
+      if(els.hDesc) els.hDesc.textContent = describe(C.hType, C.hA, C.hShift, C.hScale, C.mode);
+      if(els.yDesc) els.yDesc.textContent = (C.mode === "continuous")
         ? "y(t)=∫ x(τ)h(t−τ)dτ"
         : "y[n]=Σ x[k]h[n−k]";
 
@@ -462,12 +454,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const xVals = tVec.map(C.xFun);
       const hVals = tVec.map(C.hFun);
 
-      if (C.mode === "continuous") {
-        plotContinuous(els.cx, tVec, xVals, { xMin: C.tMin, xMax: C.tMax });
-        plotContinuous(els.ch, tVec, hVals, { xMin: C.tMin, xMax: C.tMax });
-      } else {
-        plotDiscrete(els.cx, tVec, xVals, { xMin: tVec[0], xMax: tVec[tVec.length - 1] });
-        plotDiscrete(els.ch, tVec, hVals, { xMin: tVec[0], xMax: tVec[tVec.length - 1] });
+      if(els.cx && els.ch) {
+          if (C.mode === "continuous") {
+            plotContinuous(els.cx, tVec, xVals, { xMin: C.tMin, xMax: C.tMax }, 'x(t)');
+            plotContinuous(els.ch, tVec, hVals, { xMin: C.tMin, xMax: C.tMax }, 'h(t)');
+          } else {
+            plotDiscrete(els.cx, tVec, xVals, { xMin: tVec[0], xMax: tVec[tVec.length - 1] }, 'x[n]');
+            plotDiscrete(els.ch, tVec, hVals, { xMin: tVec[0], xMax: tVec[tVec.length - 1] }, 'h[n]');
+          }
       }
 
       // Compute key
@@ -507,28 +501,30 @@ document.addEventListener("DOMContentLoaded", () => {
       const tMarker = (C.mode === "continuous") ? tNow : Math.round(tNow);
       const yNow = sampleAt(state.tVec, state.yVec, tMarker, (C.mode === "continuous"));
 
-      // Plot y(t): continuous line OR discrete stems
-      if (C.mode === "continuous") {
-        plotContinuous(els.cy, state.tVec, state.yVec, {
-          xMin: C.tMin, xMax: C.tMax,
-          vline: tMarker,
-          point: { x: tMarker, y: yNow }
-        });
-      } else {
-        plotDiscrete(els.cy, state.tVec, state.yVec, {
-          xMin: state.tVec[0],
-          xMax: state.tVec[state.tVec.length - 1],
-          vline: tMarker,
-          point: { x: tMarker, y: yNow }
-        });
+      // Plot y(t)
+      if(els.cy) {
+          if (C.mode === "continuous") {
+            plotContinuous(els.cy, state.tVec, state.yVec, {
+              xMin: C.tMin, xMax: C.tMax,
+              vline: tMarker,
+              point: { x: tMarker, y: yNow }
+            }, 'y(t)');
+          } else {
+            plotDiscrete(els.cy, state.tVec, state.yVec, {
+              xMin: state.tVec[0],
+              xMax: state.tVec[state.tVec.length - 1],
+              vline: tMarker,
+              point: { x: tMarker, y: yNow }
+            }, 'y[n]');
+          }
       }
 
       // Integrand plot
       drawIntegrand(C, tMarker, yNow);
 
       // readouts
-      els.tNow.textContent = (C.mode === "continuous") ? tMarker.toFixed(2) : String(tMarker);
-      els.yNow.textContent = yNow.toFixed(3);
+      if(els.tNow) els.tNow.textContent = (C.mode === "continuous") ? tMarker.toFixed(2) : String(tMarker);
+      if(els.yNow) els.yNow.textContent = yNow.toFixed(3);
     }
 
     /* ========= Events ========= */
@@ -540,46 +536,50 @@ document.addEventListener("DOMContentLoaded", () => {
     ];
 
     inputs.forEach(el => {
-      el.addEventListener("input", () => state.auto ? recompute(true) : recompute(false));
-      el.addEventListener("change", () => state.auto ? recompute(true) : recompute(false));
+      if(el) {
+          el.addEventListener("input", () => state.auto ? recompute(true) : recompute(false));
+          el.addEventListener("change", () => state.auto ? recompute(true) : recompute(false));
+      }
     });
 
-    els.tSlider.addEventListener("input", () => recompute(false));
+    if(els.tSlider) els.tSlider.addEventListener("input", () => recompute(false));
 
-    els.modeCont.addEventListener("click", () => setMode("continuous"));
-    els.modeDisc.addEventListener("click", () => setMode("discrete"));
+    if(els.modeCont) els.modeCont.addEventListener("click", () => setMode("continuous"));
+    if(els.modeDisc) els.modeDisc.addEventListener("click", () => setMode("discrete"));
 
-    els.btnRecalc?.addEventListener("click", () => recompute(true));
+    if(els.btnRecalc) els.btnRecalc.addEventListener("click", () => recompute(true));
 
-    els.btnReset?.addEventListener("click", () => {
+    if(els.btnReset) els.btnReset.addEventListener("click", () => {
       state.mode = "continuous";
       updateModeButtons();
 
-      els.tMin.value = "-6";
-      els.tMax.value = "6";
+      if(els.tMin) els.tMin.value = "-6";
+      if(els.tMax) els.tMax.value = "6";
 
-      els.xType.value = "u";
-      els.hType.value = "rect";
+      if(els.xType) els.xType.value = "u";
+      if(els.hType) els.hType.value = "rect";
 
-      els.xA.value = "1";
-      els.xShift.value = "0";
-      els.xScale.value = "1";
+      if(els.xA) els.xA.value = "1";
+      if(els.xShift) els.xShift.value = "0";
+      if(els.xScale) els.xScale.value = "1";
 
-      els.hA.value = "1";
-      els.hShift.value = "0";
-      els.hScale.value = "1";
+      if(els.hA) els.hA.value = "1";
+      if(els.hShift) els.hShift.value = "0";
+      if(els.hScale) els.hScale.value = "1";
 
-      setSliderFromT(0, parseFloat(els.tMin.value), parseFloat(els.tMax.value));
+      if(els.tMin && els.tMax) {
+          setSliderFromT(0, parseFloat(els.tMin.value), parseFloat(els.tMax.value));
+      }
       recompute(true);
     });
 
-    els.btnAuto?.addEventListener("click", () => {
+    if(els.btnAuto) els.btnAuto.addEventListener("click", () => {
       state.auto = !state.auto;
-      els.autoState.textContent = state.auto ? "ON" : "OFF";
+      if(els.autoState) els.autoState.textContent = state.auto ? "ON" : "OFF";
       els.btnAuto.classList.toggle("primary", !state.auto);
     });
 
-    els.btnExport?.addEventListener("click", () => {
+    if(els.btnExport) els.btnExport.addEventListener("click", () => {
       if (!state.tVec.length) return;
       const rows = [["t", "y"]];
       for (let i = 0; i < state.tVec.length; i++) rows.push([state.tVec[i], state.yVec[i]]);
@@ -597,8 +597,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     window.addEventListener("keydown", (e) => {
       if (e.key === "Enter") { e.preventDefault(); recompute(true); return; }
-      if (e.key.toLowerCase() === "r") { e.preventDefault(); els.btnReset.click(); return; }
-      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      if (e.key.toLowerCase() === "r") { e.preventDefault(); if(els.btnReset) els.btnReset.click(); return; }
+      if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && els.tSlider) {
         const step = e.shiftKey ? 12 : 3;
         const v = parseInt(els.tSlider.value, 10);
         els.tSlider.value = String(clamp(v + (e.key === "ArrowRight" ? step : -step), 0, 1000));
@@ -608,7 +608,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // init
     updateModeButtons();
-    setSliderFromT(0, parseFloat(els.tMin.value), parseFloat(els.tMax.value));
+    if(els.tMin && els.tMax) {
+        setSliderFromT(0, parseFloat(els.tMin.value), parseFloat(els.tMax.value));
+    }
     recompute(true);
   })();
 });

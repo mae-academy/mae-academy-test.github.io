@@ -1,6 +1,39 @@
 :root {
+      /* Container Width */
       --W: 1200px;
 
+      /* MAE Academy Brand Colors */
+      --maeA: #08b58d;
+      --maeB: #3f6fff;
+      --brand: #08b58d;
+      --brand2: #3f6fff;
+
+      /* Surface & Background */
+      --bg: #f6f8fc;
+      --card: #ffffff;
+      --panel: #ffffff;
+      --panel2: #f3f6ff;
+      
+      /* Typography */
+      --text: #0f172a;
+      --muted: #51607a;
+      
+      /* Borders & Shadows */
+      --border: rgba(15, 23, 42, .12);
+      --shadow: 0 18px 40px rgba(2, 8, 23, .10);
+      --shadow2: 0 10px 24px rgba(2, 8, 23, .08);
+      
+      /* Semantic Colors */
+      --good: #16a34a;
+      --bad: #ef4444;
+      --warn: #f59e0b;
+      --accent: #2563eb;
+      
+      /* Spacing */
+      --radius: 18px;
+      --radius2: 14px;
+
+      /* Ring Effects */
       --ring: 0 0 0 10px rgba(63,111,255,.12);
       --ring2: 0 0 0 8px rgba(8,181,141,.14);
     }
@@ -50,7 +83,29 @@
     }
 
     /* Page */
-    .wrap{ max-width: var(--W); margin: 0 auto; padding: 18px 18px 40px; }
+    .wrap{
+      max-width: var(--W);
+      margin: 0 auto;
+      padding: 18px 18px 40px;
+      position: relative;
+    }
+
+    .wrap::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(520px 220px at 70% 10%, rgba(8, 181, 141, .08), transparent 60%),
+        radial-gradient(520px 240px at 20% 70%, rgba(63, 111, 255, .08), transparent 60%);
+      opacity: .6;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .wrap > * {
+      position: relative;
+      z-index: 1;
+    }
 
     .hero{
       display:flex; align-items:flex-start; justify-content:space-between;
@@ -78,6 +133,13 @@
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       overflow:hidden;
+      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 20px 35px rgba(2, 8, 23, .12);
+      border-color: rgba(63, 111, 255, .22);
     }
     .card-h{
       padding: 14px 16px;
@@ -103,11 +165,11 @@
       outline: none;
       transition: box-shadow .12s ease, border-color .12s ease;
     }
-    select:focus, input:focus{
+    select:focus, input[type="number"]:focus{
       border-color: rgba(63,111,255,.35);
       box-shadow: 0 0 0 6px rgba(63,111,255,.10);
     }
-    input[type="range"]{ width:100%; accent-color: var(--brand2); }
+    input[type="range"]{ width:100%; accent-color: var(--brand2); cursor:pointer; }
 
     .row{ display:flex; gap: 10px; flex-wrap:wrap; }
     .row > *{ flex: 1 1 150px; }
@@ -145,12 +207,11 @@
     */
     .plots{
       display:grid;
-      grid-template-columns: 1fr;
+      grid-template-columns: 1fr 1fr;
       grid-template-areas:
-        "x"
-        "h"
-        "xh"
-        "y";
+        "x h"
+        "xh xh"
+        "y y";
       gap: 14px;
       padding: 14px;
     }
@@ -160,6 +221,13 @@
       padding: 10px;
       background: linear-gradient(180deg, rgba(248,251,255,.92), #fff);
       box-shadow: 0 10px 22px rgba(16,24,40,.06);
+      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+
+    .plot:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 28px rgba(16,24,40,.08);
+      border-color: rgba(63, 111, 255, .15);
     }
     .plot.x  { grid-area: x; }
     .plot.h  { grid-area: h; }
@@ -173,8 +241,37 @@
     }
     .plot-title span{ color: var(--muted); font-weight: 800; font-size: 12px; }
 
-    canvas{ width: 100%; height: 260px; display:block; }
-    canvas.big{ height: 310px; }
+    canvas{ width: 100%; max-width: 100%; height: 260px; display:block; }
+    canvas.big{ width: 100%; max-width: 100%; height: 310px; }
+
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: var(--shadow2);
+      transition: .15s transform, .15s box-shadow, .15s background, .15s border-color;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(63, 111, 255, .22);
+      box-shadow: 0 10px 20px rgba(16, 24, 40, .08);
+    }
+
+    .btn:active {
+      transform: translateY(0px);
+      box-shadow: 0 6px 14px rgba(2, 8, 23, .10)
+    }
+
+    .btn.primary {
+      background: linear-gradient(135deg, var(--maeA), var(--maeB));
+      color: #06101a;
+      border-color: transparent;
+      font-weight: 900;
+    }
 
     .footerline{
       margin-top: 16px;
@@ -182,4 +279,21 @@
       color: var(--muted);
       font-weight: 800;
       font-size: 12px;
+    }
+
+    /* Utility Classes */
+    .text-center {
+      text-align: center;
+    }
+
+    .text-muted {
+      color: var(--muted);
+    }
+
+    .gap-8 {
+      gap: 8px;
+    }
+
+    .gap-16 {
+      gap: 16px;
     }

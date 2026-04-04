@@ -422,6 +422,153 @@ document.addEventListener("DOMContentLoaded", () => {
     round: (val) => {
       return Math.abs(val) < 1e-10 ? 0 : Math.round(val * 1e10) / 1e10;
     },
+
+    /**
+     * Frobenius Norm: sqrt(sum of squares of all elements)
+     */
+    frobeniusNorm: (A) => {
+      MathEngine.validateMatrix(A, "Matrix A (Frobenius norm)");
+      let sum = 0;
+      for (const row of A) {
+        for (const val of row) {
+          sum += val * val;
+        }
+      }
+      return Math.sqrt(sum);
+    },
+
+    /**
+     * Sum all elements in matrix
+     */
+    sum: (A) => {
+      MathEngine.validateMatrix(A, "Matrix A (sum)");
+      return A.reduce((total, row) => total + row.reduce((r, v) => r + v, 0), 0);
+    },
+
+    /**
+     * Max element in matrix
+     */
+    max: (A) => {
+      MathEngine.validateMatrix(A, "Matrix A (max)");
+      return Math.max(...A.map((row) => Math.max(...row)));
+    },
+
+    /**
+     * Min element in matrix
+     */
+    min: (A) => {
+      MathEngine.validateMatrix(A, "Matrix A (min)");
+      return Math.min(...A.map((row) => Math.min(...row)));
+    },
+
+    /**
+     * Matrix power: A^n (for small n)
+     */
+    power: (A, n) => {
+      MathEngine.validateMatrix(A, "Matrix A (power)");
+      const { rows, cols } = MathEngine.dims(A);
+      if (rows !== cols) {
+        throw new Error(`Power requires square matrix, got ${rows}×${cols}`);
+      }
+      if (!Number.isInteger(n) || n < 0) {
+        throw new Error("Power must be non-negative integer");
+      }
+      if (n === 0) {
+        // Return identity matrix
+        const I = Array(rows).fill(null).map((_, i) => {
+          const row = Array(cols).fill(0);
+          row[i] = 1;
+          return row;
+        });
+        return I;
+      }
+      let result = MathEngine.clone(A);
+      for (let i = 1; i < n; i++) {
+        result = MathEngine.multiply(result, A);
+      }
+      return result;
+    },
+
+    /**
+     * Row sum: sum of each row
+     */
+    rowSum: (A) => {
+      MathEngine.validateMatrix(A, "Matrix A (row sum)");
+      return A.map((row) => row.reduce((sum, v) => sum + v, 0));
+    },
+
+    /**
+     * Column sum: sum of each column
+     */
+    colSum: (A) => {
+      MathEngine.validateMatrix(A, "Matrix A (column sum)");
+      const { cols } = MathEngine.dims(A);
+      const result = Array(cols).fill(0);
+      for (const row of A) {
+        for (let j = 0; j < cols; j++) {
+          result[j] += row[j];
+        }
+      }
+      return result;
+    },
+
+    /**
+     * Diagonal elements
+     */
+    diag: (A) => {
+      MathEngine.validateMatrix(A, "Matrix A (diagonal)");
+      const { rows, cols } = MathEngine.dims(A);
+      const n = Math.min(rows, cols);
+      const result = [];
+      for (let i = 0; i < n; i++) {
+        result.push(A[i][i]);
+      }
+      return result;
+    },
+
+    /**
+     * Create diagonal matrix from vector
+     */
+    diagMatrix: (v) => {
+      if (!Array.isArray(v) || !v.every((x) => typeof x === "number")) {
+        throw new Error("Input must be array of numbers");
+      }
+      const n = v.length;
+      const result = Array(n).fill(null).map(() => Array(n).fill(0));
+      for (let i = 0; i < n; i++) {
+        result[i][i] = v[i];
+      }
+      return result;
+    },
+
+    /**
+     * Simple eigenvalues for 2x2 matrices (characteristic polynomial)
+     */
+    eigenvalues2x2: (A) => {
+      MathEngine.validateMatrix(A, "Matrix A (eigenvalues)");
+      const { rows, cols } = MathEngine.dims(A);
+      if (rows !== 2 || cols !== 2) {
+        throw new Error("2x2 eigenvalues only work for 2×2 matrices");
+      }
+      const trace = A[0][0] + A[1][1];
+      const det = A[0][0] * A[1][1] - A[0][1] * A[1][0];
+      const discriminant = trace * trace - 4 * det;
+      
+      if (discriminant < 0) {
+        return {
+          type: "complex",
+          real: trace / 2,
+          imag: Math.sqrt(-discriminant) / 2,
+        };
+      }
+      
+      const sqrt_disc = Math.sqrt(discriminant);
+      return {
+        type: "real",
+        lambda1: (trace + sqrt_disc) / 2,
+        lambda2: (trace - sqrt_disc) / 2,
+      };
+    },
   };
 
   // =========================================================
@@ -535,12 +682,12 @@ document.addEventListener("DOMContentLoaded", () => {
        */
       readMatrixGrid: (gridId) => {
         const grid = DOM.select(`#${gridId}`);
-        const inputs = grid.querySelectorAll("input");
+        const inputs = Array.from(grid.querySelectorAll("input"));
         const cols = parseInt(grid.style.gridTemplateColumns?.match(/\d+/)?.[0]) || 3;
 
         const matrix = [];
         for (let i = 0; i < inputs.length; i += cols) {
-          const row = Array.from(inputs.slice(i, i + cols)).map((inp) => {
+          const row = inputs.slice(i, i + cols).map((inp) => {
             const val = parseFloat(inp.value);
             if (isNaN(val)) throw new Error(`Non-numeric value: ${inp.value}`);
             return val;
@@ -638,19 +785,32 @@ document.addEventListener("DOMContentLoaded", () => {
     root.innerHTML = `
       <div class="operations-panel">
         <div class="operation-section">
-          <h3>Solve Linear System Ax = b</h3>
+          <h3>Solve Linear System: Ax = b</h3>
+          <p class="hint">📝 Enter coefficient matrix A and constant vector b to solve the system.</p>
           <div id="eq-a-editor"></div>
           <div id="eq-b-editor"></div>
           <div class="button-group">
-            <button class="btn-primary" onclick="window.solveSysGauss()">Solve (Gaussian Elimination)</button>
-            <button class="btn-secondary" onclick="window.solveViaCramer()">Solve (Cramer's Rule)</button>
+            <button class="btn-primary" onclick="window.solveSysGauss()">Solve (Gaussian)</button>
+            <button class="btn-secondary" onclick="window.solveViaCramer()">Cramer's Rule</button>
           </div>
         </div>
       </div>
     `;
 
-    const aEditor = UIController.createMatrixEditor(root.querySelector("#eq-a-editor"), "eqA", 3, 3, "Matrix A");
-    const bEditor = UIController.createMatrixEditor(root.querySelector("#eq-b-editor"), "eqb", 3, 1, "Vector b");
+    const aContainer = root.querySelector("#eq-a-editor");
+    const bContainer = root.querySelector("#eq-b-editor");
+
+    // Create editors with default values
+    const aEditor = UIController.createMatrixEditor(aContainer, "eqA", 3, 3, "Matrix A");
+    const bEditor = UIController.createMatrixEditor(bContainer, "eqb", 3, 1, "Vector b");
+
+    // Set default example values
+    setTimeout(() => {
+      const defaultA = [[2, 1, -1], [-3, -1, 2], [-2, 1, 2]];
+      const defaultb = [[8], [-11], [-3]];
+      UIController.writeMatrixGrid("eqA_grid", defaultA, 3);
+      UIController.writeMatrixGrid("eqb_grid", defaultb, 1);
+    }, 50);
 
     window.solveSysGauss = () => {
       try {
@@ -711,31 +871,70 @@ document.addEventListener("DOMContentLoaded", () => {
       <div class="operations-panel">
         <div class="operation-section">
           <h3>Matrix Operations</h3>
+          <p class="hint">🟩 Perform operations on matrices A and B. Modify dimensions as needed.</p>
           <div id="mop-a-editor"></div>
           <div id="mop-b-editor"></div>
+          
+          <p class="sectionTitle">Basic Operations</p>
           <div class="button-group">
-            <button class="btn-primary" onclick="window.opTranspose()">A<sup>T</sup> (Transpose)</button>
+            <button class="btn-primary" onclick="window.opTranspose()">A<sup>T</sup></button>
             <button class="btn-primary" onclick="window.opAdd()">A + B</button>
             <button class="btn-primary" onclick="window.opSubtract()">A - B</button>
             <button class="btn-primary" onclick="window.opMultiply()">A × B</button>
+          </div>
+
+          <p class="sectionTitle">Scalar & Element-wise</p>
+          <div class="button-group">
+            <button class="btn-secondary" onclick="window.opScalarMult()">k × A</button>
+            <button class="btn-secondary" onclick="window.opPower()">A<sup>n</sup></button>
+            <button class="btn-secondary" onclick="window.opSum()">sum(A)</button>
+            <button class="btn-secondary" onclick="window.opMinMax()">min/max</button>
+          </div>
+
+          <p class="sectionTitle">Norms & Properties</p>
+          <div class="button-group">
             <button class="btn-secondary" onclick="window.opDeterminant()">det(A)</button>
             <button class="btn-secondary" onclick="window.opTrace()">trace(A)</button>
-            <button class="btn-secondary" onclick="window.opInverse()">A<sup>-1</sup></button>
+            <button class="btn-secondary" onclick="window.opFrobNorm()">||A||<sub>F</sub></button>
             <button class="btn-secondary" onclick="window.opRank()">rank(A)</button>
+          </div>
+
+          <p class="sectionTitle">Decomposition & Extraction</p>
+          <div class="button-group">
+            <button class="btn-secondary" onclick="window.opInverse()">A<sup>-1</sup></button>
+            <button class="btn-secondary" onclick="window.opDiag()">diag(A)</button>
+            <button class="btn-secondary" onclick="window.opRowSum()">row sum</button>
+            <button class="btn-secondary" onclick="window.opColSum()">col sum</button>
+          </div>
+
+          <p class="sectionTitle">Advanced</p>
+          <div class="button-group">
+            <button class="btn-secondary" onclick="window.opEigenvalues()">λ (2×2)</button>
           </div>
         </div>
       </div>
     `;
 
-    const aEditor = UIController.createMatrixEditor(root.querySelector("#mop-a-editor"), "mopA", 3, 3, "Matrix A");
-    const bEditor = UIController.createMatrixEditor(root.querySelector("#mop-b-editor"), "mopB", 3, 3, "Matrix B");
+    const aContainer = root.querySelector("#mop-a-editor");
+    const bContainer = root.querySelector("#mop-b-editor");
+
+    const aEditor = UIController.createMatrixEditor(aContainer, "mopA", 3, 3, "Matrix A");
+    const bEditor = UIController.createMatrixEditor(bContainer, "mopB", 3, 3, "Matrix B");
+
+    // Set default example values
+    setTimeout(() => {
+      const defaultA = [[4, 7], [2, 6], [1, 3]];
+      const defaultB = [[3, 2], [1, 5], [4, 1]];
+      UIController.writeMatrixGrid("mopA_grid", defaultA, 2);
+      UIController.writeMatrixGrid("mopB_grid", defaultB, 2);
+    }, 50);
 
     window.opTranspose = () => {
       try {
         const A = UIController.readMatrixGrid("mopA_grid");
         const AT = MathEngine.transpose(A);
         UIController.clearOutput();
-        UIController.showResult("A<sup>T</sup> (Transpose)", LatexFormatter.matrix(AT));
+        UIController.showResult("A<sup>T</sup> (Transpose of A)", LatexFormatter.matrix(AT));
       } catch (e) {
         UIController.showError(e.message);
       }
@@ -747,7 +946,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const B = UIController.readMatrixGrid("mopB_grid");
         const C = MathEngine.add(A, B);
         UIController.clearOutput();
-        UIController.showResult("A + B", LatexFormatter.matrix(C));
+        UIController.showResult("A + B (Sum)", LatexFormatter.matrix(C));
       } catch (e) {
         UIController.showError(e.message);
       }
@@ -759,7 +958,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const B = UIController.readMatrixGrid("mopB_grid");
         const C = MathEngine.subtract(A, B);
         UIController.clearOutput();
-        UIController.showResult("A - B", LatexFormatter.matrix(C));
+        UIController.showResult("A - B (Difference)", LatexFormatter.matrix(C));
       } catch (e) {
         UIController.showError(e.message);
       }
@@ -771,7 +970,34 @@ document.addEventListener("DOMContentLoaded", () => {
         const B = UIController.readMatrixGrid("mopB_grid");
         const C = MathEngine.multiply(A, B);
         UIController.clearOutput();
-        UIController.showResult("A × B", LatexFormatter.matrix(C));
+        UIController.showResult("A × B (Product)", LatexFormatter.matrix(C));
+      } catch (e) {
+        UIController.showError(e.message);
+      }
+    };
+
+    window.opScalarMult = () => {
+      try {
+        const k = parseFloat(prompt("Enter scalar (k):") || "2");
+        if (isNaN(k)) throw new Error("Invalid scalar value");
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const C = MathEngine.scalarMult(k, A);
+        UIController.clearOutput();
+        UIController.showResult(`${k} × A (Scalar multiplication)`, LatexFormatter.matrix(C),
+          `<p><strong>Scalar:</strong> ${k}</p>`);
+      } catch (e) {
+        UIController.showError(e.message);
+      }
+    };
+
+    window.opPower = () => {
+      try {
+        const n = parseInt(prompt("Enter power (n, 0-5):", "2") || "2");
+        if (isNaN(n) || n < 0 || n > 5) throw new Error("Invalid power (must be 0-5)");
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const C = MathEngine.power(A, n);
+        UIController.clearOutput();
+        UIController.showResult(`A<sup>${n}</sup> (Matrix power)`, LatexFormatter.matrix(C));
       } catch (e) {
         UIController.showError(e.message);
       }
@@ -782,7 +1008,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const A = UIController.readMatrixGrid("mopA_grid");
         const det = MathEngine.determinant(A);
         UIController.clearOutput();
-        UIController.showResult("det(A)", LatexFormatter.scalar(det));
+        UIController.showResult("det(A) (Determinant)", LatexFormatter.scalar(det), 
+          `<p><strong>Note:</strong> ${Math.abs(det) < 1e-10 ? '⚠️ Matrix is singular (det ≈ 0)' : '✓ Matrix is non-singular'}</p>`);
       } catch (e) {
         UIController.showError(e.message);
       }
@@ -793,7 +1020,20 @@ document.addEventListener("DOMContentLoaded", () => {
         const A = UIController.readMatrixGrid("mopA_grid");
         const tr = MathEngine.trace(A);
         UIController.clearOutput();
-        UIController.showResult("trace(A)", LatexFormatter.scalar(tr));
+        UIController.showResult("trace(A) (Trace)", LatexFormatter.scalar(tr),
+          `<p><strong>Note:</strong> Sum of diagonal elements</p>`);
+      } catch (e) {
+        UIController.showError(e.message);
+      }
+    };
+
+    window.opFrobNorm = () => {
+      try {
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const norm = MathEngine.frobeniusNorm(A);
+        UIController.clearOutput();
+        UIController.showResult("||A||<sub>F</sub> (Frobenius Norm)", LatexFormatter.scalar(norm),
+          `<p><strong>Note:</strong> Square root of sum of squared elements</p>`);
       } catch (e) {
         UIController.showError(e.message);
       }
@@ -815,7 +1055,87 @@ document.addEventListener("DOMContentLoaded", () => {
         const A = UIController.readMatrixGrid("mopA_grid");
         const r = MathEngine.rank(A);
         UIController.clearOutput();
-        UIController.showResult("rank(A)", LatexFormatter.scalar(r));
+        UIController.showResult("rank(A) (Rank)", LatexFormatter.scalar(r),
+          `<p><strong>Dimensions:</strong> ${A.length} × ${A[0].length}</p>`);
+      } catch (e) {
+        UIController.showError(e.message);
+      }
+    };
+
+    window.opSum = () => {
+      try {
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const s = MathEngine.sum(A);
+        UIController.clearOutput();
+        UIController.showResult("sum(A) (Sum of all elements)", LatexFormatter.scalar(s));
+      } catch (e) {
+        UIController.showError(e.message);
+      }
+    };
+
+    window.opMinMax = () => {
+      try {
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const minVal = MathEngine.min(A);
+        const maxVal = MathEngine.max(A);
+        UIController.clearOutput();
+        UIController.showResult("min(A) and max(A)", `\\[\\text{min} = ${minVal}, \\quad \\text{max} = ${maxVal}\\]`);
+      } catch (e) {
+        UIController.showError(e.message);
+      }
+    };
+
+    window.opDiag = () => {
+      try {
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const d = MathEngine.diag(A);
+        UIController.clearOutput();
+        UIController.showResult("diag(A) (Diagonal elements)", LatexFormatter.vector(d),
+          `<p><strong>Note:</strong> Extracted ${d.length} diagonal elements</p>`);
+      } catch (e) {
+        UIController.showError(e.message);
+      }
+    };
+
+    window.opRowSum = () => {
+      try {
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const rs = MathEngine.rowSum(A);
+        UIController.clearOutput();
+        UIController.showResult("Row sums", LatexFormatter.vector(rs),
+          `<p><strong>Note:</strong> Sum of each row</p>`);
+      } catch (e) {
+        UIController.showError(e.message);
+      }
+    };
+
+    window.opColSum = () => {
+      try {
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const cs = MathEngine.colSum(A);
+        UIController.clearOutput();
+        UIController.showResult("Column sums", LatexFormatter.vector(cs),
+          `<p><strong>Note:</strong> Sum of each column</p>`);
+      } catch (e) {
+        UIController.showError(e.message);
+      }
+    };
+
+    window.opEigenvalues = () => {
+      try {
+        const A = UIController.readMatrixGrid("mopA_grid");
+        const result = MathEngine.eigenvalues2x2(A);
+        let html = "";
+
+        if (result.type === "real") {
+          html = `\\[\\lambda_1 = ${result.lambda1.toFixed(4)}, \\quad \\lambda_2 = ${result.lambda2.toFixed(4)}\\]`;
+        } else {
+          html = `\\[\\lambda = ${result.real.toFixed(4)} \\pm ${result.imag.toFixed(4)}i\\]`;
+        }
+
+        UIController.clearOutput();
+        UIController.showResult("Eigenvalues (2×2 matrices)", html,
+          `<p><strong>Type:</strong> ${result.type} eigenvalues</p>`);
       } catch (e) {
         UIController.showError(e.message);
       }
@@ -862,4 +1182,46 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   initApp();
+
+  // =========================================================
+  //  GLOBAL UTILITY FUNCTIONS
+  // =========================================================
+
+  /**
+   * Clear all matrices and results
+   */
+  window.clearAllMatrices = () => {
+    document.querySelectorAll("input.cell").forEach((inp) => {
+      inp.value = "0";
+    });
+    UIController.clearOutput();
+    UIController.showResult("Cleared", "\\text{All matrices and results cleared}");
+  };
+
+  /**
+   * Export results as JSON/CSV
+   */
+  window.exportResults = () => {
+    try {
+      const output = document.querySelector("#output");
+      const text = output.innerText || "No results to export";
+      
+      const latex = output.innerHTML;
+      const data = {
+        timestamp: new Date().toISOString(),
+        results: text,
+      };
+      
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `linear-algebra-results-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      UIController.showError("Export failed: " + e.message);
+    }
+  };
 });

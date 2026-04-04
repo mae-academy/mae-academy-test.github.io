@@ -36,9 +36,9 @@ const matrixUtils = { ... }     // Reusable utilities
 - **Removed innerHTML parsing** for grid updates → Direct element creation
 
 **Performance Impact:**
-- Grid resizing: ~70% fewer layout recalculations
-- Output updates: ~80% fewer DOM operations
-- Page initialization: ~30% faster
+- Grid resizing: ~$70\%$ fewer layout recalculations
+- Output updates: ~$80\%$ fewer DOM operations
+- Page initialization: ~$30\%$ faster
 
 ### 1.4 **Mathematical Algorithm Improvements**
 
@@ -55,7 +55,7 @@ const matrixUtils = { ... }     // Reusable utilities
 - Better numerical stability checks
 
 #### Eigen value Computation
-- Layered fallback strategy: math.eigs → 2×2 analytical → Error
+- Layered fallback strategy: math.eigs → $2 \times 2$ analytical → Error
 - Improved error messages for unsupported cases
 - More robust detection of degenerate cases
 
@@ -106,10 +106,10 @@ const freeCols = Array.from({length: n}, (_, j) => j)
 
 | Before | After | Reduction |
 |--------|-------|-----------|
-| 600+ lines | 420+ lines | **30% smaller** |
-| 45 unique selectors | 28 semantic selectors | **38% fewer** |
-| Inline styles (scattered) | CSS variables | **100% centralized** |
-| 8 gradient definitions | 2 base gradients | **75% fewer** |
+| 600+ lines | 420+ lines | **$30\%$ smaller** |
+| 45 unique selectors | 28 semantic selectors | **$38\%$ fewer** |
+| Inline styles (scattered) | CSS variables | **$100\%$ centralized** |
+| 8 gradient definitions | 2 base gradients | **$75\%$ fewer** |
 
 **Removed redundancies:**
 - Duplicate button styles consolidated
@@ -197,11 +197,11 @@ Document Structure:
 
 | Operation | Before | After | Improvement |
 |-----------|--------|-------|-------------|
-| RREF on 3×3 matrix | ~8ms | ~6ms | **25% faster** |
-| Output update (10 lines) | ~12ms | ~2ms | **83% faster** |
-| Grid resize (4→6) | ~25ms | ~8ms | **68% faster** |
-| Page initialization | ~450ms | ~320ms | **30% faster** |
-| Matrix multiplication | ~5ms | ~4.5ms | **10% faster** |
+| RREF on $3 \times 3$ matrix | ~$8\text{ms}$ | ~$6\text{ms}$ | **$25\%$ faster** |
+| Output update ($10$ lines) | ~$12\text{ms}$ | ~$2\text{ms}$ | **$83\%$ faster** |
+| Grid resize ($4 \to 6$) | ~$25\text{ms}$ | ~$8\text{ms}$ | **$68\%$ faster** |
+| Page initialization | ~$450\text{ms}$ | ~$320\text{ms}$ | **$30\%$ faster** |
+| Matrix multiplication | ~$5\text{ms}$ | ~$4.5\text{ms}$ | **$10\%$ faster** |
 
 ---
 
@@ -220,7 +220,7 @@ No IE11 support (acceptable for STEM web app)
 ## 7. Testing Checklist
 
 ### Functional Tests
-- ✅ Gauss elimination with 3×3 system
+- ✅ Gauss elimination with $3 \times 3$ system
 - ✅ RREF computation with varied matrices
 - ✅ Determinant calculation (singular detection)
 - ✅ Matrix inversion (error handling)
@@ -251,7 +251,7 @@ No IE11 support (acceptable for STEM web app)
 ## 8. Future Enhancement Opportunities
 
 1. **Caching**: Implement LRU cache for frequently computed RREF matrices
-2. **Worker Threads**: Offload heavy computations to Web Workers for 4×4+ operations
+2. **Worker Threads**: Offload heavy computations to Web Workers for $4 \times 4+$ operations
 3. **Advanced Features**: Singular Value Decomposition (SVD), QR factorization
 4. **Visualization**: 3D transformation viewer
 5. **Storing**: LocalStorage for saving matrix history
@@ -279,20 +279,20 @@ No IE11 support (acceptable for STEM web app)
 
 | File | Before | After | Change |
 |------|--------|-------|--------|
-| script.js | 1267 lines | 1044 lines | **-18% smaller**, better organized |
-| style.css | 600+ lines | 420+ lines | **-30% smaller**, modern |
-| index.html | 107 lines | 107 lines | ✅ No change (already optimal) |
+| script.js | $1267$ lines | $1044$ lines | **$-18\%$ smaller**, better organized |
+| style.css | $600+$ lines | $420+$ lines | **$-30\%$ smaller**, modern |
+| index.html | $107$ lines | $107$ lines | ✅ No change (already optimal) |
 
 ---
 
 ## Summary
 
 This optimization initiative successfully:
-✅ Reduced file sizes by 18-30%
-✅ Improved perceived performance by 25-83% on key operations
+✅ Reduced file sizes by $18\text{--}30\%$
+✅ Improved perceived performance by $25\text{--}83\%$ on key operations
 ✅ Enhanced code maintainability with modular ES6+ patterns
 ✅ Modernized UI/UX with minimalist design
-✅ Maintained 100% feature parity
+✅ Maintained $100\%$ feature parity
 ✅ Improved error handling and edge case management
 ✅ Created sustainable foundation for future enhancements
 
