@@ -25,7 +25,8 @@
       .then(res => res.text())
       .then(data => {
         document.getElementById('navbar').innerHTML = data;
-        document.getElementById("pageTitle").textContent = "Convolution Simulator";
+        const pt = document.getElementById("pageTitle");
+        if(pt) pt.textContent = "Convolution Simulator";
       });
   </script>
 
@@ -38,7 +39,6 @@
     </div>
 
     <section class="grid reveal">
-      <!-- Controls -->
       <div class="card">
         <div class="card-h">
           <strong>Controls</strong>
@@ -156,7 +156,6 @@
         </div>
       </div>
 
-      <!-- Plots -->
       <div class="card">
         <div class="card-h">
           <strong>Plots</strong>
@@ -166,22 +165,30 @@
         <div class="plots">
           <div class="plot x">
             <div class="plot-title">x(t) <span id="xDesc"></span></div>
-            <canvas id="cx" width="900" height="360"></canvas>
+            <div class="chart-wrapper">
+              <canvas id="cx"></canvas>
+            </div>
           </div>
 
           <div class="plot h">
             <div class="plot-title">h(t) <span id="hDesc"></span></div>
-            <canvas id="ch" width="900" height="360"></canvas>
+            <div class="chart-wrapper">
+              <canvas id="ch"></canvas>
+            </div>
           </div>
 
           <div class="plot xh">
             <div class="plot-title">x*h (integrand) <span id="intDesc"></span></div>
-            <canvas id="cint" class="big" width="900" height="420"></canvas>
+            <div class="chart-wrapper big">
+              <canvas id="cint"></canvas>
+            </div>
           </div>
 
           <div class="plot y">
             <div class="plot-title">y(t) (convolution output) <span id="yDesc"></span></div>
-            <canvas id="cy" class="big" width="900" height="420"></canvas>
+            <div class="chart-wrapper big">
+              <canvas id="cy"></canvas>
+            </div>
           </div>
         </div>
       </div>

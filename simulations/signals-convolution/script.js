@@ -125,17 +125,20 @@ document.addEventListener("DOMContentLoaded", () => {
     function createChart(canvasId, data, opts = {}) {
       opts = opts || {};
       
-      // Always destroy the old chart completely before creating a new one
-      if (chartsState[canvasId]) {
-        chartsState[canvasId].destroy();
-        chartsState[canvasId] = null;
-      }
-      
       const customPluginOpts = {
         vlineX: opts.vline,
         pointMarker: opts.point
       };
 
+      // FIX: Update existing charts instead of destroying them to fix canvas creep and lagging.
+      if (chartsState[canvasId]) {
+        const chart = chartsState[canvasId];
+        chart.data = data;
+        chart.config.options.customPluginOpts = customPluginOpts;
+        chart.update('none'); // Instant update without animation
+        return chart;
+      }
+      
       const ctx = document.getElementById(canvasId).getContext('2d');
       const GRID = "rgba(9,16,42,0.10)";
       const TICKS = "rgba(9,16,42,0.70)";
@@ -145,10 +148,9 @@ document.addEventListener("DOMContentLoaded", () => {
         data: data,
         options: {
           customPluginOpts: customPluginOpts,
-          responsive: false,
+          responsive: true,
           maintainAspectRatio: false,
           animation: false,
-          animations: { tension: { duration: 0 } },
           interaction: { mode: 'index', intersect: false },
           layout: {
             padding: 0
@@ -431,7 +433,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return recompute(true);
       }
 
-      // t/n vector
       let tVec;
       if (C.mode === "continuous") {
         tVec = linspace(C.tMin, C.tMax, C.nT);
@@ -443,14 +444,12 @@ document.addEventListener("DOMContentLoaded", () => {
         for (let i = 0; i < len; i++) tVec[i] = nMin + i;
       }
 
-      // Descriptions
       if(els.xDesc) els.xDesc.textContent = describe(C.xType, C.xA, C.xShift, C.xScale, C.mode);
       if(els.hDesc) els.hDesc.textContent = describe(C.hType, C.hA, C.hShift, C.hScale, C.mode);
       if(els.yDesc) els.yDesc.textContent = (C.mode === "continuous")
         ? "y(t)=∫ x(τ)h(t−τ)dτ"
         : "y[n]=Σ x[k]h[n−k]";
 
-      // Plot x(t), h(t)
       const xVals = tVec.map(C.xFun);
       const hVals = tVec.map(C.hFun);
 
@@ -464,7 +463,6 @@ document.addEventListener("DOMContentLoaded", () => {
           }
       }
 
-      // Compute key
       const key = JSON.stringify({
         mode: C.mode, tMin: C.tMin, tMax: C.tMax, nT: C.nT, nTau: C.nTau,
         x: C.xType, xA: C.xA, xShift: (C.mode === "discrete" ? Math.round(C.xShift) : C.xShift), xScale: C.xScale,
@@ -496,12 +494,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      // marker t
       const tNow = getTFromSlider(C.tMin, C.tMax);
       const tMarker = (C.mode === "continuous") ? tNow : Math.round(tNow);
       const yNow = sampleAt(state.tVec, state.yVec, tMarker, (C.mode === "continuous"));
 
-      // Plot y(t)
       if(els.cy) {
           if (C.mode === "continuous") {
             plotContinuous(els.cy, state.tVec, state.yVec, {
@@ -519,15 +515,12 @@ document.addEventListener("DOMContentLoaded", () => {
           }
       }
 
-      // Integrand plot
       drawIntegrand(C, tMarker, yNow);
 
-      // readouts
       if(els.tNow) els.tNow.textContent = (C.mode === "continuous") ? tMarker.toFixed(2) : String(tMarker);
       if(els.yNow) els.yNow.textContent = yNow.toFixed(3);
     }
 
-    /* ========= Events ========= */
     const inputs = [
       els.tMin, els.tMax,
       els.xType, els.hType,
