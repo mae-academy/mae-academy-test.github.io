@@ -1,0 +1,621 @@
+/**
+ * PLC Ladder Logic Simulator - Ladder Editor
+ * Visual editor for creating and modifying ladder diagrams
+ */
+
+class LadderEditor {
+    constructor(plc, containerId) {
+        this.plc = plc;
+        this.container = document.getElementById(containerId);
+        this.selectedElement = null;
+        this.selectedRungIndex = -1;
+        this.selectedElementIndex = -1;
+        this.draggedType = null;
+
+        this.init();
+    }
+
+    init() {
+        this.setupDragAndDrop();
+        this.render();
+    }
+
+    // ============================================================
+    // Rendering
+
+    render() {
+        const rungsContainer = document.getElementById('rungs-container');
+        const rungs = this.plc.program.rungs;
+
+        if (rungs.length === 0) {
+            rungsContainer.innerHTML = `
+                <div class="empty-state">
+                    <p>No rungs yet. Click "Add Rung" or drag components to start.</p>
+                </div>
+            `;
+            this.updateRungCount();
+            return;
+        }
+
+        let html = '';
+
+        rungs.forEach((rung, rungIndex) => {
+            const activeClass = rung.active ? 'active' : '';
+
+            html += `
+                <div class="rung ${activeClass}" data-rung-index="${rungIndex}">
+                    <span class="rung-number">${rungIndex + 1}</span>
+                    <div class="rung-content">
+                        <div class="rung-wire drop-zone" data-wire-index="0" ${rung.active ? 'active' : ''}><div class="flow-dot"></div></div>
+            `;
+
+            if (rung.elements && rung.elements.length > 0) {
+                rung.elements.forEach((element, elemIndex) => {
+                    html += this.renderElement(element, rungIndex, elemIndex);
+                    html += `<div class="rung-wire drop-zone" data-wire-index="${elemIndex + 1}" ${element.active ? 'active' : ''}><div class="flow-dot"></div></div>`;
+                });
+            }
+
+            html += `
+                    </div>
+                </div>
+            `;
+        });
+
+        rungsContainer.innerHTML = html;
+
+        // Setup event listeners
+        this.setupElementListeners();
+        this.updateRungCount();
+    }
+
+    renderElement(element, rungIndex, elemIndex) {
+        const activeClass = element.active ? 'active' : '';
+        const selectedClass = (rungIndex === this.selectedRungIndex &&
+                               elemIndex === this.selectedElementIndex) ? 'selected' : '';
+
+        let symbol = '';
+        let isBlock = false;
+
+        switch (element.type) {
+            case 'NO':
+                symbol = '─┤ ├─';
+                break;
+            case 'NC':
+                symbol = '─┤/├─';
+                break;
+            case 'P_TRIG':
+                symbol = '─┤P├─';
+                break;
+            case 'N_TRIG':
+                symbol = '─┤N├─';
+                break;
+            case 'OUT':
+                symbol = '─( )─';
+                break;
+            case 'OUT_N':
+                symbol = '─(/)─';
+                break;
+            case 'SET':
+                symbol = '─(S)─';
+                break;
+            case 'RESET':
+                symbol = '─(R)─';
+                break;
+            case 'TON':
+            case 'TOF':
+            case 'TP':
+            case 'CTU':
+            case 'CTD':
+            case 'CTUD':
+            case 'EQ':
+            case 'GT':
+            case 'LT':
+                isBlock = true;
+                break;
+            default:
+                symbol = '─[?]─';
+        }
+
+        if (isBlock) {
+            return this.renderBlock(element, rungIndex, elemIndex, activeClass, selectedClass);
+        }
+
+        return `
+            <div class="ladder-element ${activeClass} ${selectedClass}"
+                 data-rung-index="${rungIndex}"
+                 data-elem-index="${elemIndex}"
+                 data-type="${element.type}">
+                <div class="element-symbol">${symbol}</div>
+                <div class="element-address">${element.address || '???'}</div>
+                ${element.comment ? `<div class="element-comment">${element.comment}</div>` : ''}
+            </div>
+        `;
+    }
+
+    renderBlock(element, rungIndex, elemIndex, activeClass, selectedClass) {
+        let blockName = element.type;
+        let params = [];
+
+        switch (element.type) {
+            case 'TON':
+                blockName = 'TON';
+                params = [
+                    { label: 'IN', value: element.active ? 'ON' : 'OFF' },
+                    { label: 'PT', value: `${element.preset || 1000}ms` },
+                    { label: 'ET', value: `${element.currentValue || 0}ms` },
+                    { label: 'Q', value: element.active ? 'ON' : 'OFF' }
+                ];
+                break;
+            case 'TOF':
+                blockName = 'TOF';
+                params = [
+                    { label: 'IN', value: element.active ? 'ON' : 'OFF' },
+                    { label: 'PT', value: `${element.preset || 1000}ms` },
+                    { label: 'ET', value: `${element.currentValue || 0}ms` },
+                    { label: 'Q', value: element.active ? 'ON' : 'OFF' }
+                ];
+                break;
+            case 'TP':
+                blockName = 'TP';
+                params = [
+                    { label: 'IN', value: element.active ? 'ON' : 'OFF' },
+                    { label: 'PT', value: `${element.preset || 1000}ms` },
+                    { label: 'ET', value: `${element.currentValue || 0}ms` }
+                ];
+                break;
+            case 'CTU':
+                blockName = 'CTU';
+                params = [
+                    { label: 'CU', value: element.active ? 'ON' : 'OFF' },
+                    { label: 'PV', value: element.preset || 10 },
+                    { label: 'CV', value: element.currentValue || 0 },
+                    { label: 'Q', value: element.active ? 'ON' : 'OFF' }
+                ];
+                break;
+            case 'CTD':
+                blockName = 'CTD';
+                params = [
+                    { label: 'CD', value: element.active ? 'ON' : 'OFF' },
+                    { label: 'PV', value: element.preset || 10 },
+                    { label: 'CV', value: element.currentValue || 0 }
+                ];
+                break;
+            case 'CTUD':
+                blockName = 'CTUD';
+                params = [
+                    { label: 'CU/CD', value: element.active ? 'ON' : 'OFF' },
+                    { label: 'PV', value: element.preset || 10 },
+                    { label: 'CV', value: element.currentValue || 0 }
+                ];
+                break;
+            case 'EQ':
+                blockName = '==';
+                params = [
+                    { label: 'Val1', value: element.value1 || 0 },
+                    { label: 'Val2', value: element.value2 || 0 }
+                ];
+                break;
+            case 'GT':
+                blockName = '>';
+                params = [
+                    { label: 'Val1', value: element.value1 || 0 },
+                    { label: 'Val2', value: element.value2 || 0 }
+                ];
+                break;
+            case 'LT':
+                blockName = '<';
+                params = [
+                    { label: 'Val1', value: element.value1 || 0 },
+                    { label: 'Val2', value: element.value2 || 0 }
+                ];
+                break;
+        }
+
+        const paramsHtml = params.map(p => `
+            <div class="block-param">
+                <span>${p.label}:</span>
+                <span class="value">${p.value}</span>
+            </div>
+        `).join('');
+
+        return `
+            <div class="ladder-element block ${activeClass} ${selectedClass}"
+                 data-rung-index="${rungIndex}"
+                 data-elem-index="${elemIndex}"
+                 data-type="${element.type}">
+                <div class="block-header">${blockName}</div>
+                <div class="block-params">
+                    ${paramsHtml}
+                </div>
+                <div class="element-address">${element.timerId || element.counterId || element.address || ''}</div>
+            </div>
+        `;
+    }
+
+    updateRungCount() {
+        const countEl = document.getElementById('rung-count');
+        if (countEl) {
+            countEl.textContent = `${this.plc.program.rungs.length} Rungs`;
+        }
+
+        const nameEl = document.getElementById('program-name');
+        if (nameEl) {
+            nameEl.textContent = this.plc.program.name || 'Untitled Program';
+        }
+    }
+
+    // ============================================================
+    // Drag and Drop
+    // ============================================================
+
+    setupDragAndDrop() {
+        // Component palette items
+        Array.from(document.querySelectorAll('.component-item')).forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                this.draggedType = item.dataset.type;
+                e.dataTransfer.effectAllowed = 'copy';
+            });
+
+            item.addEventListener('dragend', () => {
+                this.draggedType = null;
+            });
+        });
+
+        // Drop zones
+        this.container.addEventListener('dragover', (e) => {
+            const dropZone = e.target.closest('.drop-zone');
+            if (dropZone && this.draggedType) {
+                e.preventDefault();
+                // Check if drop is valid at this position
+                if (this.isValidDropPosition(dropZone, this.draggedType)) {
+                    dropZone.classList.add('drag-valid');
+                    dropZone.classList.remove('drag-invalid');
+                } else {
+                    dropZone.classList.add('drag-invalid');
+                    dropZone.classList.remove('drag-valid');
+                }
+            }
+        });
+
+        this.container.addEventListener('dragleave', (e) => {
+            const dropZone = e.target.closest('.drop-zone');
+            if (dropZone) {
+                dropZone.classList.remove('drag-valid', 'drag-invalid');
+            }
+        });
+
+        this.container.addEventListener('drop', (e) => {
+            const dropZone = e.target.closest('.drop-zone');
+            if (dropZone && this.draggedType) {
+                e.preventDefault();
+                dropZone.classList.remove('drag-valid', 'drag-invalid');
+
+                // Only allow drop if position is valid
+                if (this.isValidDropPosition(dropZone, this.draggedType)) {
+                    const rungIndex = parseInt(dropZone.closest('.rung').dataset.rungIndex);
+                    const wireIndex = parseInt(dropZone.dataset.wireIndex);
+                    this.addElementToRung(rungIndex, this.draggedType, wireIndex);
+                }
+            }
+        });
+    }
+
+    // Validate if a drop position is valid for the given element type
+    isValidDropPosition(dropZone, elementType) {
+        // For now, we'll allow dropping any element type in any drop zone
+        // In a more sophisticated implementation, we might have rules like:
+        // - Certain elements can only be dropped in certain positions
+        // - Maximum number of certain element types per rung
+        // - Specific sequence requirements (e.g., coils must be at the end of a rung)
+        return true;
+    }
+
+    addElementToRung(rungIndex, type, position = undefined) {
+        const element = this.createDefaultElement(type);
+
+        // Show properties modal
+        this.showPropertiesModal(element, (result) => {
+            if (result) {
+                Object.assign(element, result);
+                if (position !== undefined && position >= 0 && position <= this.plc.program.rungs[rungIndex].elements.length) {
+                    // Insert at specific position
+                    this.plc.program.rungs[rungIndex].elements.splice(position, 0, element);
+                } else {
+                    // Append to end (default behavior)
+                    this.plc.addElement(rungIndex, element);
+                }
+                this.render();
+            }
+        });
+    }
+
+    createDefaultElement(type) {
+        const element = {
+            type: type,
+            address: '',
+            comment: '',
+            active: false
+        };
+
+        // Set defaults based on type
+        switch (type) {
+            case 'NO':
+            case 'NC':
+            case 'P_TRIG':
+            case 'N_TRIG':
+                element.address = 'I0.0';
+                break;
+            case 'OUT':
+            case 'OUT_N':
+            case 'SET':
+            case 'RESET':
+                element.address = 'Q0.0';
+                break;
+            case 'TON':
+            case 'TOF':
+            case 'TP':
+                element.timerId = 'T0';
+                element.preset = 1000;
+                break;
+            case 'CTU':
+            case 'CTD':
+            case 'CTUD':
+                element.counterId = 'C0';
+                element.preset = 10;
+                break;
+            case 'EQ':
+            case 'GT':
+            case 'LT':
+                element.value1 = 0;
+                element.value2 = 0;
+                break;
+        }
+
+        return element;
+    }
+
+    // ============================================================
+    // Element Selection & Properties
+    // ============================================================
+
+    setupElementListeners() {
+        Array.from(this.container.querySelectorAll('.ladder-element')).forEach(elem => {
+            elem.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const rungIndex = parseInt(elem.dataset.rungIndex);
+                const elemIndex = parseInt(elem.dataset.elemIndex);
+                this.selectElement(rungIndex, elemIndex);
+            });
+
+            elem.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                const rungIndex = parseInt(elem.dataset.rungIndex);
+                const elemIndex = parseInt(elem.dataset.elemIndex);
+                this.editElement(rungIndex, elemIndex);
+            });
+        });
+
+        // Click outside to deselect
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.ladder-element') && !e.target.closest('.modal')) {
+                this.deselectElement();
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (this.selectedRungIndex >= 0 && this.selectedElementIndex >= 0) {
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    e.preventDefault();
+                    this.deleteSelectedElement();
+                }
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.editElement(this.selectedRungIndex, this.selectedElementIndex);
+                }
+            }
+        });
+    }
+
+    selectElement(rungIndex, elemIndex) {
+        this.selectedRungIndex = rungIndex;
+        this.selectedElementIndex = elemIndex;
+        this.render();
+    }
+
+    deselectElement() {
+        this.selectedRungIndex = -1;
+        this.selectedElementIndex = -1;
+        this.render();
+    }
+
+    deleteSelectedElement() {
+        if (this.selectedRungIndex >= 0 && this.selectedElementIndex >= 0) {
+            this.plc.removeElement(this.selectedRungIndex, this.selectedElementIndex);
+            this.deselectElement();
+        }
+    }
+
+    editElement(rungIndex, elemIndex) {
+        const rung = this.plc.program.rungs[rungIndex];
+        if (!rung) return;
+
+        const element = rung.elements[elemIndex];
+        if (!element) return;
+
+        this.showPropertiesModal(element, (result) => {
+            if (result) {
+                Object.assign(element, result);
+                this.render();
+            }
+        }, true);
+    }
+
+    // ============================================================
+    // Properties Modal
+    // ============================================================
+
+    showPropertiesModal(element, callback, showDelete = false) {
+        const modal = document.getElementById('properties-modal');
+        const addressInput = document.getElementById('prop-address');
+        const commentInput = document.getElementById('prop-comment');
+        const presetInput = document.getElementById('prop-preset');
+        const counterPresetInput = document.getElementById('prop-counter-preset');
+        const timerProps = document.querySelector('.timer-props');
+        const counterProps = document.querySelector('.counter-props');
+        const deleteBtn = document.getElementById('btn-delete');
+
+        // Set values
+        addressInput.value = element.address || element.timerId || element.counterId || '';
+        commentInput.value = element.comment || '';
+
+        // Show/hide timer/counter properties
+        const isTimer = ['TON', 'TOF', 'TP'].includes(element.type);
+        const isCounter = ['CTU', 'CTD', 'CTUD'].includes(element.type);
+
+        timerProps.style.display = isTimer ? 'block' : 'none';
+        counterProps.style.display = isCounter ? 'block' : 'none';
+
+        if (isTimer) {
+            presetInput.value = element.preset || 1000;
+        }
+        if (isCounter) {
+            counterPresetInput.value = element.preset || 10;
+        }
+
+        // Show/hide delete button
+        deleteBtn.style.display = showDelete ? 'block' : 'none';
+
+        // Open modal
+        modal.classList.add('open');
+
+        // Event handlers
+        const closeModal = () => {
+            modal.classList.remove('open');
+        };
+
+        const applyChanges = () => {
+            const result = {
+                address: addressInput.value.toUpperCase(),
+                comment: commentInput.value
+            };
+
+            if (isTimer) {
+                result.timerId = addressInput.value.toUpperCase();
+                result.preset = parseInt(presetInput.value) || 1000;
+            }
+
+            if (isCounter) {
+                result.counterId = addressInput.value.toUpperCase();
+                result.preset = parseInt(counterPresetInput.value) || 10;
+            }
+
+            closeModal();
+            callback(result);
+        };
+
+        const deleteElement = () => {
+            closeModal();
+            this.deleteSelectedElement();
+        };
+
+        // Remove old listeners and add new ones
+        const applyBtn = document.getElementById('btn-apply');
+        const cancelBtn = document.getElementById('btn-cancel');
+        const closeBtn = document.getElementById('modal-close');
+
+        const newApplyBtn = applyBtn.cloneNode(true);
+        const newCancelBtn = cancelBtn.cloneNode(true);
+        const newCloseBtn = closeBtn.cloneNode(true);
+        const newDeleteBtn = deleteBtn.cloneNode(true);
+
+        applyBtn.parentNode.replaceChild(newApplyBtn, applyBtn);
+        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+        closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+        deleteBtn.parentNode.replaceChild(newDeleteBtn, deleteBtn);
+
+        newApplyBtn.addEventListener('click', applyChanges);
+        newCancelBtn.addEventListener('click', closeModal);
+        newCloseBtn.addEventListener('click', closeModal);
+        newDeleteBtn.addEventListener('click', deleteElement);
+    }
+
+    // ============================================================
+    // Rung Operations
+    // ============================================================
+
+    addRung() {
+        this.plc.addRung();
+        this.render();
+    }
+
+    deleteRung(index) {
+        this.plc.removeRung(index);
+        this.render();
+    }
+
+    // ============================================================
+    // Update from PLC
+    // ============================================================
+
+    update() {
+        // Only update active states without full re-render
+        Array.from(document.querySelectorAll('.rung')).forEach((rungEl, rungIndex) => {
+            const rung = this.plc.program.rungs[rungIndex];
+            if (!rung) return;
+
+            rungEl.classList.toggle('active', rung.active);
+
+            // Update wires
+            Array.from(rungEl.querySelectorAll('.rung-wire')).forEach((wire, i) => {
+                if (i === 0) {
+                    wire.classList.toggle('active', rung.active);
+                } else if (rung.elements[i - 1]) {
+                    wire.classList.toggle('active', rung.elements[i - 1].active);
+                }
+            });
+
+            // Update elements
+            Array.from(rungEl.querySelectorAll('.ladder-element')).forEach((elemEl, elemIndex) => {
+                const element = rung.elements[elemIndex];
+                if (element) {
+                    elemEl.classList.toggle('active', element.active);
+
+                    // Update block values
+                    if (elemEl.classList.contains('block')) {
+                        const params = elemEl.querySelectorAll('.block-param .value');
+                        if (element.type.startsWith('T')) {
+                            // Timer
+                            if (params[2]) params[2].textContent = `${element.currentValue || 0}ms`;
+                            if (params[3]) params[3].textContent = element.active ? 'ON' : 'OFF';
+                        } else if (element.type.startsWith('C')) {
+                            // Counter
+                            if (params[2]) params[2].textContent = element.currentValue || 0;
+                        }
+                    }
+                }
+            });
+        });
+
+        // Update scan time
+        const scanTimeEl = document.getElementById('scan-time');
+        if (scanTimeEl) {
+            scanTimeEl.textContent = this.plc.scanTime;
+        }
+    }
+
+    // Validate if a drop position is valid for the given element type
+    isValidDropPosition(dropZone, elementType) {
+        // Currently, all drop zones are considered valid for simplicity
+        // In a more sophisticated implementation, this could check:
+        // - Rung capacity limits
+        // - Element type restrictions (e.g., certain elements can't be first/last)
+        // - Syntax rules of ladder logic
+        return dropZone !== null;
+    }
+}
+}
+
+// Export
+window.LadderEditor = LadderEditor;

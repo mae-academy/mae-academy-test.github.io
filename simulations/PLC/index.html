@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PLC Ladder Logic Simulator</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <span class="logo-icon">⚡</span>
+                    <span class="logo-text">PLC Simulator</span>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="toolbar">
+                    <button class="tool-btn" id="btn-new" title="New Program">
+                        <span>📄</span> New
+                    </button>
+                    <button class="tool-btn" id="btn-open" title="Open Program">
+                        <span>📂</span> Open
+                    </button>
+                    <button class="tool-btn" id="btn-save" title="Save Program">
+                        <span>💾</span> Save
+                    </button>
+                    <div class="toolbar-divider"></div>
+                    <button class="tool-btn" id="btn-run" title="Run Program">
+                        <span>▶️</span> Run
+                    </button>
+                    <button class="tool-btn" id="btn-stop" title="Stop Program" disabled>
+                        <span>⏹️</span> Stop
+                    </button>
+                    <button class="tool-btn" id="btn-step" title="Step Through">
+                        <span>⏭️</span> Step
+                    </button>
+                    <div class="toolbar-divider"></div>
+                    <button class="tool-btn" id="btn-add-rung" title="Add Rung">
+                        <span>➕</span> Add Rung
+                    </button>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="status-indicator" id="plc-status">
+                    <span class="status-dot stopped"></span>
+                    <span class="status-text">STOPPED</span>
+                </div>
+                <div class="scan-time">
+                    Scan: <span id="scan-time">0</span>ms
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Left Panel - Component Palette -->
+            <aside class="panel palette-panel">
+                <div class="panel-header">
+                    <h3>Components</h3>
+                </div>
+                <div class="panel-content">
+                    <div class="component-group">
+                        <h4>Inputs</h4>
+                        <div class="component-list">
+                            <div class="component-item" draggable="true" data-type="NO">
+                                <div class="component-symbol">─┤ ├─</div>
+                                <div class="component-name">NO Contact</div>
+                            </div>
+                            <div class="component-item" draggable="true" data-type="NC">
+                                <div class="component-symbol">─┤/├─</div>
+                                <div class="component-name">NC Contact</div>
+                            </div>
+                            <div class="component-item" draggable="true" data-type="P_TRIG">
+                                <div class="component-symbol">─┤P├─</div>
+                                <div class="component-name">Positive Edge</div>
+                            </div>
+                            <div class="component-item" draggable="true" data-type="N_TRIG">
+                                <div class="component-symbol">─┤N├─</div>
+                                <div class="component-name">Negative Edge</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="component-group">
+                        <h4>Outputs</h4>
+                        <div class="component-list">
+                            <div class="component-item" draggable="true" data-type="OUT">
+                                <div class="component-symbol">─( )─</div>
+                                <div class="component-name">Output Coil</div>
+                            </div>
+                            <div class="component-item" draggable="true" data-type="OUT_N">
+                                <div class="component-symbol">─(/)─</div>
+                                <div class="component-name">Negated Output</div>
+                            </div>
+                            <div class="component-item" draggable="true" data-type="SET">
+                                <div class="component-symbol">─(S)─</div>
+                                <div class="component-name">Set (Latch)</div>
+                            </div>
+                            <div class="component-item" draggable="true" data-type="RESET">
+                                <div class="component-symbol">─(R)─</div>
+                                <div class="component-name">Reset (Unlatch)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="component-group">
+                        <h4>Timers</h4>
+                        <div class="component-list">
+                            <div class="component-item" draggable="true" data-type="TON">
+                                <div class="component-symbol">[TON]</div>
+                                <div class="component-name">Timer On-Delay</div>
+                            </div>
+                            <div class="component-item" draggable="true" data-type="TOF">
+                                <div class="component-symbol">[TOF]</div>
+                                <div class="component-name">Timer Off-Delay</div>
+                            </div>
+                            <div class="component-item" draggable="true" data-type="TP">
+                                <div class="component-symbol">[TP]</div>
+                                <div class="component-name">Pulse Timer</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="component-group">
+                        <h4>Counters</h4>
+                        <div class="component-list">
+                            <div class="component-item" draggable="true" data-type="CTU">
+                                <div class="component-symbol">[CTU]</div>
+                                <div class="component-name">Count Up</div>
+                            </div>
+                            <div class="component-item" draggable="true" data-type="CTD">
+                                <div class="component-symbol">[CTD]</div>
+                                <div class="component-name">Count Down</div>
+                            </div>
+                            <div class="component-item" draggable="true" data-type="CTUD">
+                                <div class="component-symbol">[CTUD]</div>
+                                <div class="component-name">Count Up/Down</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="component-group">
+                        <h4>Compare</h4>
+                        <div class="component-list">
+                            <div class="component-item" draggable="true" data-type="EQ">
+                                <div class="component-symbol">[==]</div>
+                                <div class="component-name">Equal</div>
+                            </div>
+                            <div class="component-item" draggable="true" data-type="GT">
+                                <div class="component-symbol">[>]</div>
+                                <div class="component-name">Greater Than</div>
+                            </div>
+                            <div class="component-item" draggable="true" data-type="LT">
+                                <div class="component-symbol">[<]</div>
+                                <div class="component-name">Less Than</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Center - Ladder Editor -->
+            <section class="panel editor-panel">
+                <div class="panel-header">
+                    <h3>Ladder Diagram</h3>
+                    <div class="editor-info">
+                        <span id="program-name">Untitled Program</span>
+                        <span id="rung-count">0 Rungs</span>
+                    </div>
+                </div>
+                <div class="ladder-editor" id="ladder-editor">
+                    <div class="power-rail left-rail"></div>
+                    <div class="rungs-container" id="rungs-container">
+                        <!-- Rungs will be added here -->
+                        <div class="empty-state">
+                            <p>No rungs yet. Click "Add Rung" or drag components to start.</p>
+                        </div>
+                    </div>
+                    <div class="power-rail right-rail"></div>
+                </div>
+            </section>
+
+            <!-- Right Panel - I/O Monitor -->
+            <aside class="panel io-panel">
+                <div class="panel-header">
+                    <h3>I/O Monitor</h3>
+                </div>
+                <div class="panel-content">
+                    <!-- Inputs Section -->
+                    <div class="io-section">
+                        <h4>Digital Inputs</h4>
+                        <div class="io-grid" id="inputs-grid">
+                            <div class="io-item" data-address="I0.0">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">I0.0</span>
+                                <button class="io-toggle" data-address="I0.0">Toggle</button>
+                            </div>
+                            <div class="io-item" data-address="I0.1">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">I0.1</span>
+                                <button class="io-toggle" data-address="I0.1">Toggle</button>
+                            </div>
+                            <div class="io-item" data-address="I0.2">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">I0.2</span>
+                                <button class="io-toggle" data-address="I0.2">Toggle</button>
+                            </div>
+                            <div class="io-item" data-address="I0.3">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">I0.3</span>
+                                <button class="io-toggle" data-address="I0.3">Toggle</button>
+                            </div>
+                            <div class="io-item" data-address="I0.4">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">I0.4</span>
+                                <button class="io-toggle" data-address="I0.4">Toggle</button>
+                            </div>
+                            <div class="io-item" data-address="I0.5">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">I0.5</span>
+                                <button class="io-toggle" data-address="I0.5">Toggle</button>
+                            </div>
+                            <div class="io-item" data-address="I0.6">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">I0.6</span>
+                                <button class="io-toggle" data-address="I0.6">Toggle</button>
+                            </div>
+                            <div class="io-item" data-address="I0.7">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">I0.7</span>
+                                <button class="io-toggle" data-address="I0.7">Toggle</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Outputs Section -->
+                    <div class="io-section">
+                        <h4>Digital Outputs</h4>
+                        <div class="io-grid" id="outputs-grid">
+                            <div class="io-item output" data-address="Q0.0">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">Q0.0</span>
+                            </div>
+                            <div class="io-item output" data-address="Q0.1">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">Q0.1</span>
+                            </div>
+                            <div class="io-item output" data-address="Q0.2">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">Q0.2</span>
+                            </div>
+                            <div class="io-item output" data-address="Q0.3">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">Q0.3</span>
+                            </div>
+                            <div class="io-item output" data-address="Q0.4">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">Q0.4</span>
+                            </div>
+                            <div class="io-item output" data-address="Q0.5">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">Q0.5</span>
+                            </div>
+                            <div class="io-item output" data-address="Q0.6">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">Q0.6</span>
+                            </div>
+                            <div class="io-item output" data-address="Q0.7">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">Q0.7</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Memory Section -->
+                    <div class="io-section">
+                        <h4>Memory Bits</h4>
+                        <div class="io-grid" id="memory-grid">
+                            <div class="io-item memory" data-address="M0.0">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">M0.0</span>
+                            </div>
+                            <div class="io-item memory" data-address="M0.1">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">M0.1</span>
+                            </div>
+                            <div class="io-item memory" data-address="M0.2">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">M0.2</span>
+                            </div>
+                            <div class="io-item memory" data-address="M0.3">
+                                <div class="io-indicator off"></div>
+                                <span class="io-label">M0.3</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Timers/Counters Section -->
+                    <div class="io-section">
+                        <h4>Timers & Counters</h4>
+                        <div class="timer-counter-list" id="timer-counter-list">
+                            <div class="tc-item" data-id="T0">
+                                <span class="tc-name">T0</span>
+                                <span class="tc-value">0ms</span>
+                                <div class="tc-bar"><div class="tc-fill" style="width: 0%"></div></div>
+                            </div>
+                            <div class="tc-item" data-id="T1">
+                                <span class="tc-name">T1</span>
+                                <span class="tc-value">0ms</span>
+                                <div class="tc-bar"><div class="tc-fill" style="width: 0%"></div></div>
+                            </div>
+                            <div class="tc-item" data-id="C0">
+                                <span class="tc-name">C0</span>
+                                <span class="tc-value">0</span>
+                                <div class="tc-bar"><div class="tc-fill" style="width: 0%"></div></div>
+                            </div>
+                            <div class="tc-item" data-id="C1">
+                                <span class="tc-name">C1</span>
+                                <span class="tc-value">0</span>
+                                <div class="tc-bar"><div class="tc-fill" style="width: 0%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <!-- Bottom Panel - Examples & Help -->
+        <footer class="footer">
+            <div class="examples-bar">
+                <span class="examples-label">Examples:</span>
+                <button class="example-btn" data-example="start-stop">Start/Stop Motor</button>
+                <button class="example-btn" data-example="traffic-light">Traffic Light</button>
+                <button class="example-btn" data-example="conveyor">Conveyor System</button>
+                <button class="example-btn" data-example="tank-level">Tank Level Control</button>
+                <button class="example-btn" data-example="sequence">Sequential Process</button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Element Properties Modal -->
+    <div class="modal" id="properties-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Element Properties</h3>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Address</label>
+                    <input type="text" id="prop-address" placeholder="e.g., I0.0, Q0.1, M0.0">
+                </div>
+                <div class="form-group">
+                    <label>Comment</label>
+                    <input type="text" id="prop-comment" placeholder="Optional description">
+                </div>
+                <div class="form-group timer-props" style="display: none;">
+                    <label>Preset Time (ms)</label>
+                    <input type="number" id="prop-preset" value="1000" min="0">
+                </div>
+                <div class="form-group counter-props" style="display: none;">
+                    <label>Preset Value</label>
+                    <input type="number" id="prop-counter-preset" value="10" min="0">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="btn-cancel">Cancel</button>
+                <button class="btn btn-danger" id="btn-delete">Delete</button>
+                <button class="btn btn-primary" id="btn-apply">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Input (hidden) -->
+    <input type="file" id="file-input" accept=".json,.plc" style="display: none;">
+
+    <script src="js/plc-core.js"></script>
+    <script src="js/ladder-editor.js"></script>
+    <script src="js/examples.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
